@@ -196,12 +196,50 @@ def compute_benchmarks(session: Session) -> PostBenchmarks | None:
     )
 
 
-def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) -> list[Candidate]:
-    """Find posts that stand out as outliers in various dimensions.
+CATEGORY_META: dict[str, dict] = {
+    "breakout": {
+        "label": "breakout",
+        "lesson": "What went right here? Study this and repeat the pattern.",
+    },
+    "conversation_catalyst": {
+        "label": "conversation catalyst",
+        "lesson": "Something about this post invited dialogue. Find it.",
+    },
+    "quiet_winner": {
+        "label": "quiet winner",
+        "lesson": "Algorithm didn't push it, but the few who saw it loved it. Worth re-surfacing.",
+    },
+    "served_but_flat": {
+        "label": "served but flat",
+        "lesson": "Algorithm tested this in a wider pool but the audience rejected it. Topic was interesting enough to distribute — framing or hook was wrong.",
+    },
+    "reply_magnet": {
+        "label": "reply magnet",
+        "lesson": "Replies dominated over likes. Conversation-first framing worked — lean into that voice.",
+    },
+    "format_win": {
+        "label": "format win",
+        "lesson": "This media format dramatically outperformed your average. Use it more.",
+    },
+    "unexpected_short_hit": {
+        "label": "short & punchy",
+        "lesson": "A very short post that broke out. Brevity + a sharp idea beat effort. Study the concept.",
+    },
+    "high_effort_flop": {
+        "label": "high-effort flop",
+        "lesson": "A long post with no engagement. Effort didn't correlate with reach — the hook, length, or topic missed. Don't equate work with value.",
+    },
+}
 
-    Returns a deduplicated list of candidates, each marked with the dimension
-    that made them noteworthy. A single post can only appear once — if it's an
-    outlier in multiple dimensions, we keep the most dramatic one.
+
+def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) -> list[Candidate]:
+    """Surface posts that carry a distinct learning lesson.
+
+    Each category maps to a specific insight the creator can extract and
+    apply. A post only appears in one category — we assign it to the
+    category where its lesson is strongest, using a simple priority ordering
+    so 'quiet_winner' beats 'breakout' when both apply (quiet winners are
+    more surprising), etc.
     """
     posts = session.scalars(select(MyPost)).all()
     if not posts:
@@ -218,6 +256,7 @@ def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) ->
         ins = latest.get(p.thread_id)
         if ins is None:
             continue
+        text_len = len(p.text or "")
         rows.append(
             {
                 "post": p,
@@ -226,25 +265,51 @@ def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) ->
                 "likes": ins.likes,
                 "replies": ins.replies,
                 "reposts": ins.reposts,
+                "media_type": p.media_type or "TEXT_POST",
+                "text_len": text_len,
             }
         )
     if not rows:
         return []
 
-    median_views = statistics.median(r["views"] for r in rows) or 1
-    median_likes = statistics.median(r["likes"] for r in rows) or 1
-    median_replies = statistics.median(r["replies"] for r in rows) or 1
-    mean_views = statistics.fmean(r["views"] for r in rows) or 1
+    # Global benchmarks
+    median_views = max(statistics.median(r["views"] for r in rows), 1)
+    median_likes = max(statistics.median(r["likes"] for r in rows), 1)
+    median_replies = max(statistics.median(r["replies"] for r in rows), 1)
+    median_text_len = max(statistics.median(r["text_len"] for r in rows if r["text_len"]), 1)
+
+    total_likes = sum(r["likes"] for r in rows)
+    total_replies = sum(r["replies"] for r in rows)
+    account_reply_to_like_ratio = (total_replies / total_likes) if total_likes else 0
+
+    # Format benchmarks: median likes within each media type
+    format_median_likes: dict[str, float] = {}
+    for media_type in {r["media_type"] for r in rows}:
+        subset = [r["likes"] for r in rows if r["media_type"] == media_type]
+        if subset:
+            format_median_likes[media_type] = max(statistics.median(subset), 1)
 
     by_id: dict[str, Candidate] = {}
 
+    # Category priorities: lower rank = higher priority. A post ends up in
+    # whichever of its matching categories has the best rank.
+    priority_rank = {
+        "quiet_winner": 1,      # most surprising insight
+        "high_effort_flop": 2,  # clearest learning
+        "format_win": 3,
+        "unexpected_short_hit": 4,
+        "reply_magnet": 5,
+        "conversation_catalyst": 6,
+        "served_but_flat": 7,
+        "breakout": 8,          # most intuitive — save for last
+    }
+
     def _add(cand: Candidate) -> None:
         existing = by_id.get(cand.post_id)
-        # Keep the most dramatic ratio
-        if existing is None or (
-            cand.ratio_vs_median is not None
-            and (existing.ratio_vs_median is None or cand.ratio_vs_median > existing.ratio_vs_median)
-        ):
+        if existing is None:
+            by_id[cand.post_id] = cand
+            return
+        if priority_rank[cand.category] < priority_rank[existing.category]:
             by_id[cand.post_id] = cand
 
     def _mk(r: dict, category: str, metric: str, value: float, ratio: float | None, why: str) -> Candidate:
@@ -265,86 +330,105 @@ def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) ->
             created_at=p.created_at,
         )
 
-    # 1. Reach outliers — views > 3x median
-    reach_sorted = sorted(rows, key=lambda r: r["views"], reverse=True)
-    for r in reach_sorted[:limit_per_category]:
-        if r["views"] >= 3 * median_views and r["views"] >= 200:
-            ratio = r["views"] / median_views
-            _add(
-                _mk(
-                    r,
-                    "reach_outlier",
-                    "views",
-                    r["views"],
-                    ratio,
-                    f"{r['views']} views vs median {median_views:.0f} ({ratio:.1f}×)",
-                )
-            )
-
-    # 2. Conversation starters — replies > 2x median AND ≥ 3 replies
-    for r in sorted(rows, key=lambda r: r["replies"], reverse=True)[:limit_per_category]:
-        if r["replies"] >= 3 and r["replies"] >= 2 * median_replies:
-            ratio = r["replies"] / median_replies if median_replies else None
-            _add(
-                _mk(
-                    r,
-                    "conversation_starter",
-                    "replies",
-                    r["replies"],
-                    ratio,
-                    f"{r['replies']} replies vs median {median_replies:.0f}",
-                )
-            )
-
-    # 3. Breakouts — likes >= 10x median
+    # --- 1. Breakouts: likes OR views ≥ 5× median
     for r in sorted(rows, key=lambda r: r["likes"], reverse=True)[:limit_per_category]:
-        if r["likes"] >= 10 * median_likes and r["likes"] >= 20:
+        if r["likes"] >= 5 * median_likes and r["likes"] >= 10:
             ratio = r["likes"] / median_likes
-            _add(
-                _mk(
-                    r,
-                    "breakout",
-                    "likes",
-                    r["likes"],
-                    ratio,
-                    f"{r['likes']} likes vs median {median_likes:.0f} ({ratio:.0f}×)",
-                )
-            )
+            _add(_mk(r, "breakout", "likes", r["likes"], ratio,
+                     f"{r['likes']} likes vs median {median_likes:.0f} ({ratio:.1f}×)"))
+    for r in sorted(rows, key=lambda r: r["views"], reverse=True)[:limit_per_category]:
+        if r["views"] >= 5 * median_views and r["views"] >= 200:
+            ratio = r["views"] / median_views
+            _add(_mk(r, "breakout", "views", r["views"], ratio,
+                     f"{r['views']} views vs median {median_views:.0f} ({ratio:.1f}×)"))
 
-    # 4. Flops worth learning from — very recent posts with 0 engagement
-    recent_rows = sorted(
-        [r for r in rows if r["post"].created_at],
-        key=lambda r: r["post"].created_at,
-        reverse=True,
-    )[:25]
-    flops = [r for r in recent_rows if r["likes"] == 0 and r["replies"] == 0]
-    for r in flops[:2]:
-        _add(
-            _mk(
-                r,
-                "flop",
-                "engagement",
-                0,
-                None,
-                f"0 likes, 0 replies — recent zero-engagement post",
-            )
-        )
+    # --- 2. Conversation catalyst: replies ≥ 3× median AND ≥3 replies
+    for r in sorted(rows, key=lambda r: r["replies"], reverse=True)[:limit_per_category]:
+        if r["replies"] >= 3 and r["replies"] >= 3 * median_replies:
+            ratio = r["replies"] / median_replies
+            _add(_mk(r, "conversation_catalyst", "replies", r["replies"], ratio,
+                     f"{r['replies']} replies vs median {median_replies:.0f} ({ratio:.1f}×)"))
 
-    # 5. High reach, low engagement anomaly (served but didn't land)
+    # --- 3. Quiet winners: views ≤ median BUT like-per-view rate ≥ 3× account average
+    account_like_per_view = (
+        sum(r["likes"] for r in rows) / sum(r["views"] for r in rows)
+        if sum(r["views"] for r in rows) else 0
+    )
     for r in rows:
-        if r["views"] >= 2 * median_views and r["likes"] <= median_likes and r["replies"] == 0:
-            _add(
-                _mk(
-                    r,
-                    "served_but_fell_flat",
-                    "views",
-                    r["views"],
-                    r["views"] / median_views,
-                    f"{r['views']} views but 0 replies and {r['likes']} likes — algorithm tested but audience didn't engage",
-                )
-            )
+        if r["views"] == 0:
+            continue
+        lpv = r["likes"] / r["views"]
+        if (
+            r["views"] <= median_views
+            and account_like_per_view > 0
+            and lpv >= 3 * account_like_per_view
+            and r["likes"] >= 3
+        ):
+            ratio = lpv / account_like_per_view
+            _add(_mk(r, "quiet_winner", "like_per_view", lpv, ratio,
+                     f"{r['likes']} likes on only {r['views']} views — {ratio:.1f}× your like-per-view rate"))
 
-    return sorted(by_id.values(), key=lambda c: (c.ratio_vs_median or 0), reverse=True)[:10]
+    # --- 4. Served but flat: views ≥ 2× median AND engagement rate ≤ 0.3× account
+    account_engagement_per_view = (
+        (sum(r["likes"] for r in rows) + sum(r["replies"] for r in rows))
+        / sum(r["views"] for r in rows)
+        if sum(r["views"] for r in rows) else 0
+    )
+    for r in rows:
+        if r["views"] == 0 or account_engagement_per_view == 0:
+            continue
+        epv = (r["likes"] + r["replies"]) / r["views"]
+        if r["views"] >= 2 * median_views and epv <= 0.3 * account_engagement_per_view:
+            ratio = r["views"] / median_views
+            _add(_mk(r, "served_but_flat", "views", r["views"], ratio,
+                     f"{r['views']} views ({ratio:.1f}× median) but {r['likes']} likes, {r['replies']} replies — audience saw it and passed"))
+
+    # --- 5. Reply magnet: reply-to-like ratio ≥ 2× account's own ratio AND ≥2 replies
+    if account_reply_to_like_ratio > 0:
+        for r in rows:
+            if r["likes"] == 0 or r["replies"] < 2:
+                continue
+            rtl = r["replies"] / r["likes"]
+            if rtl >= 2 * account_reply_to_like_ratio:
+                ratio = rtl / account_reply_to_like_ratio
+                _add(_mk(r, "reply_magnet", "reply_to_like", rtl, ratio,
+                         f"{r['replies']} replies on {r['likes']} likes — {ratio:.1f}× your usual reply-to-like ratio"))
+
+    # --- 6. Format win: a non-dominant media type massively outperformed its own subset
+    for r in rows:
+        mt = r["media_type"]
+        fm = format_median_likes.get(mt, 0)
+        if fm <= 0:
+            continue
+        if mt != "TEXT_POST" and r["likes"] >= 3 * fm and r["likes"] >= 2 * median_likes:
+            ratio = r["likes"] / median_likes
+            _add(_mk(r, "format_win", "likes", r["likes"], ratio,
+                     f"{mt} post with {r['likes']} likes — {ratio:.1f}× your median (and this format is usually underused)"))
+
+    # --- 7. Unexpected short hit: text length ≤ median/2 AND likes ≥ 3× median
+    for r in rows:
+        if r["text_len"] and r["text_len"] <= median_text_len / 2 and r["likes"] >= 3 * median_likes:
+            ratio = r["likes"] / median_likes
+            _add(_mk(r, "unexpected_short_hit", "likes", r["likes"], ratio,
+                     f"{r['text_len']} chars, {r['likes']} likes — brevity won ({ratio:.1f}× median likes)"))
+
+    # --- 8. High-effort flop: text length ≥ 2× median AND 0 likes + 0 replies
+    for r in rows:
+        if (
+            r["text_len"] >= 2 * median_text_len
+            and r["likes"] == 0
+            and r["replies"] == 0
+            and r["views"] >= median_views  # algo did serve it, it just fell flat
+        ):
+            _add(_mk(r, "high_effort_flop", "length_vs_engagement", r["text_len"], None,
+                     f"{r['text_len']} chars of effort, {r['views']} views, 0 likes + 0 replies"))
+
+    # Sort: bring the highest-priority categories first, and within a category
+    # by ratio descending.
+    return sorted(
+        by_id.values(),
+        key=lambda c: (priority_rank[c.category], -(c.ratio_vs_median or 0)),
+    )[:10]
 
 
 def generate_noteworthy_commentary(run: Run) -> list[int]:
@@ -390,20 +474,22 @@ def generate_noteworthy_commentary(run: Run) -> list[int]:
 
     system = (
         "You are a rigorous ranking analyst writing for a non-technical creator "
-        "who wants to manage their online growth. You are given:\n"
-        "  (A) NOTEWORTHY POSTS — outliers from their own recent posting.\n"
-        "  (B) INTERNAL BENCHMARKS — the user's own median/mean/best/worst/mid posts.\n\n"
-        "Your job is to explain each noteworthy post by comparing it TO THE USER'S "
-        "OWN DISTRIBUTION, not to generic Threads norms. Say things like: "
-        "'3× your median views, but 0× your median replies — unusual pattern.' "
-        "'Outperformed your mid-tier post by 4× on likes.' 'Under-performed your "
-        "worst recent post on engagement rate.'\n\n"
-        "For each post write:\n"
-        "  - commentary: 2-3 plain-English sentences a creator can understand. "
-        "Avoid jargon. Compare to the user's own benchmarks with specific ratios.\n"
+        "who wants to LEARN from their own posting patterns. Every noteworthy "
+        "post is an opportunity for a specific lesson, and the lesson depends "
+        "on the category the post falls into.\n\n"
+        "You are given:\n"
+        "  (A) NOTEWORTHY POSTS — outliers from the creator's own recent posting, "
+        "each pre-classified into a CATEGORY that names the lesson type.\n"
+        "  (B) CATEGORY LESSONS — the learning frame for each category.\n"
+        "  (C) INTERNAL BENCHMARKS — the creator's own median/mean/best/worst/mid posts.\n\n"
+        "For EACH post, write exactly two things:\n"
+        "  - lesson: 2-3 plain sentences explaining what this specific post "
+        "teaches the creator, framed around the category's learning angle. "
+        "Compare to the creator's OWN distribution with specific ratios from "
+        "the benchmarks. Tell them what to DO with this insight. Avoid jargon.\n"
         "  - algo_hypothesis: 1-2 sentences on the plausible ranker mechanism. "
         "Must be hedged ('likely', 'consistent with', 'plausible'). Never claim "
-        "causation. Cite X-documented weights only when relevant.\n\n"
+        "causation. Only cite X-documented ranker weights where relevant.\n\n"
         f"{RESEARCH_CONTEXT}"
     )
 
@@ -413,8 +499,8 @@ def generate_noteworthy_commentary(run: Run) -> list[int]:
         '  "analyses": [\n'
         "    {\n"
         '      "post_id": "<the exact post_id from the input>",\n'
-        '      "commentary": "2-3 plain-English sentences grounded in the user\'s own benchmarks. Compare with specific ratios vs median/best/mid. Accessible to a non-technical reader.",\n'
-        '      "algo_hypothesis": "1-2 sentences offering a plausible ranker mechanism CONSISTENT WITH the documented research. Must use hedged language (\'likely\', \'plausible\', \'consistent with\'). Never assert causation."\n'
+        '      "commentary": "2-3 plain sentences. The LESSON this post teaches, framed by its category. Compare to the user\'s own benchmarks with specific ratios. End with an actionable takeaway.",\n'
+        '      "algo_hypothesis": "1-2 sentences offering a plausible ranker mechanism CONSISTENT WITH the documented research. Must use hedged language. Never assert causation."\n'
         "    }\n"
         "  ]\n"
         "}"

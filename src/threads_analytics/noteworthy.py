@@ -289,28 +289,28 @@ def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) ->
         if subset:
             format_median_likes[media_type] = max(statistics.median(subset), 1)
 
-    by_id: dict[str, Candidate] = {}
+    # Each category gets its own slots. Posts can appear in multiple categories
+    # because the lesson differs across categories — a post that's both a
+    # "quiet winner" and a "breakout" teaches two different things.
+    # We cap each category to top-N and dedupe at display time only if the
+    # same post wins the same slot twice.
+    per_category: dict[str, list[Candidate]] = {}
 
-    # Category priorities: lower rank = higher priority. A post ends up in
-    # whichever of its matching categories has the best rank.
-    priority_rank = {
-        "quiet_winner": 1,      # most surprising insight
-        "high_effort_flop": 2,  # clearest learning
-        "format_win": 3,
-        "unexpected_short_hit": 4,
-        "reply_magnet": 5,
-        "conversation_catalyst": 6,
+    # Display ordering: which category should appear first when rendering.
+    # Lower rank = higher placement priority.
+    display_priority = {
+        "breakout": 1,
+        "conversation_catalyst": 2,
+        "quiet_winner": 3,
+        "reply_magnet": 4,
+        "format_win": 5,
+        "unexpected_short_hit": 6,
         "served_but_flat": 7,
-        "breakout": 8,          # most intuitive — save for last
+        "high_effort_flop": 8,
     }
 
     def _add(cand: Candidate) -> None:
-        existing = by_id.get(cand.post_id)
-        if existing is None:
-            by_id[cand.post_id] = cand
-            return
-        if priority_rank[cand.category] < priority_rank[existing.category]:
-            by_id[cand.post_id] = cand
+        per_category.setdefault(cand.category, []).append(cand)
 
     def _mk(r: dict, category: str, metric: str, value: float, ratio: float | None, why: str) -> Candidate:
         p = r["post"]
@@ -423,12 +423,28 @@ def find_noteworthy_candidates(session: Session, limit_per_category: int = 3) ->
             _add(_mk(r, "high_effort_flop", "length_vs_engagement", r["text_len"], None,
                      f"{r['text_len']} chars of effort, {r['views']} views, 0 likes + 0 replies"))
 
-    # Sort: bring the highest-priority categories first, and within a category
-    # by ratio descending.
-    return sorted(
-        by_id.values(),
-        key=lambda c: (priority_rank[c.category], -(c.ratio_vs_median or 0)),
-    )[:10]
+    # Flatten per-category buckets into a final display list:
+    #   1. Sort within each category by ratio descending (best example first)
+    #   2. Take the top 2 from each category
+    #   3. Dedupe by post_id (keep the first appearance, which is highest-priority)
+    #   4. Order the final list by display_priority
+    seen_ids: set[str] = set()
+    final: list[Candidate] = []
+    for category in sorted(per_category.keys(), key=lambda c: display_priority.get(c, 99)):
+        bucket = sorted(
+            per_category[category],
+            key=lambda c: -(c.ratio_vs_median or 0),
+        )
+        taken = 0
+        for cand in bucket:
+            if cand.post_id in seen_ids:
+                continue
+            seen_ids.add(cand.post_id)
+            final.append(cand)
+            taken += 1
+            if taken >= 2:
+                break
+    return final[:12]
 
 
 def generate_noteworthy_commentary(run: Run) -> list[int]:

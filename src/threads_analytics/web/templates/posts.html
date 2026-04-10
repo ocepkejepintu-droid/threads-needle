@@ -2,18 +2,20 @@
 {% block content %}
 <h1>Noteworthy posts</h1>
 <p class="muted">
-  Outliers from your recent posting — breakouts, conversation starters, flops worth learning from.
-  Each one is paired with Claude's algo-aware commentary on why it behaved the way it did, grounded
-  in the documented Threads/X ranking research (reply velocity, conversation depth, self-reply, format diversity).
+  Posts from your recent history that carry a specific lesson. Each one is classified into a
+  category — <em>breakout</em>, <em>conversation catalyst</em>, <em>quiet winner</em>,
+  <em>served but flat</em>, <em>reply magnet</em>, <em>format win</em>, <em>short &amp; punchy</em>,
+  <em>high-effort flop</em> — and paired with Claude's plain-English takeaway grounded in your
+  own internal benchmarks.
 </p>
 
 {% if noteworthy %}
   <div class="noteworthy-list page-grid" id="noteworthy-list">
-    {% for n in noteworthy[:5] %}
+    {% for n in noteworthy[:8] %}
       <div class="span-6 noteworthy-card card category-{{ n.category }}{% if loop.first %} nw-hero{% endif %}" data-index="{{ loop.index0 }}">
         <div class="nw-feature-hint" aria-hidden="true"></div>
         <div class="nw-head">
-          <span class="nw-category">{{ n.category.replace('_', ' ') | upper }}</span>
+          <span class="nw-category">{{ n.category_label | upper }}</span>
           {% if n.ratio_vs_median %}
             <span class="nw-ratio">{{ "%.1f" | format(n.ratio_vs_median) }}× median {{ n.remarkable_metric }}</span>
           {% else %}
@@ -21,6 +23,9 @@
           {% endif %}
           <span class="nw-date">{{ n.posted_at.strftime("%Y-%m-%d %H:%M") if n.posted_at else "" }}</span>
         </div>
+        {% if n.category_lesson %}
+          <div class="nw-lesson">{{ n.category_lesson }}</div>
+        {% endif %}
         <blockquote class="nw-text">{{ n.text }}</blockquote>
         <div class="nw-stats">
           {% if n.views is not none %}<span>{{ n.views }} views</span>{% endif %}
@@ -30,7 +35,7 @@
         </div>
         {% if n.commentary %}
           <div class="nw-commentary">
-            <div class="nw-label">Claude's read</div>
+            <div class="nw-label">Your takeaway</div>
             <p>{{ n.commentary }}</p>
           </div>
         {% endif %}
@@ -38,7 +43,7 @@
           <div class="nw-algo">
             <div class="nw-label">
               Plausible ranker mechanism
-              <span class="hypothesis-tag" title="This is a hypothesis grounded in documented X heavy-ranker weights and Meta's public Threads statements. It is not a direct observation of Threads's internals.">HYPOTHESIS</span>
+              <span class="hypothesis-tag" title="Hypothesis grounded in documented X heavy-ranker weights and Meta's public Threads statements.">HYPOTHESIS</span>
             </div>
             <p>{{ n.algo_hypothesis }}</p>
           </div>

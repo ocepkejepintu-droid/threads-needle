@@ -554,6 +554,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
 
     @router.get("/posts", response_class=HTMLResponse)
     def posts(request: Request) -> HTMLResponse:
+        from ..noteworthy import CATEGORY_META
         with session_scope() as session:
             # Noteworthy posts with Claude commentary (replaces the old posts table)
             rows = session.scalars(
@@ -562,9 +563,12 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             payload = []
             for np_row in rows:
                 post = session.get(MyPost, np_row.post_thread_id)
+                meta = CATEGORY_META.get(np_row.category, {})
                 payload.append(
                     {
                         "category": np_row.category,
+                        "category_label": meta.get("label", np_row.category.replace("_", " ")),
+                        "category_lesson": meta.get("lesson", ""),
                         "remarkable_metric": np_row.remarkable_metric,
                         "remarkable_value": np_row.remarkable_value,
                         "ratio_vs_median": np_row.ratio_vs_median,

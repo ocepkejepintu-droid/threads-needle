@@ -2015,10 +2015,32 @@ td.neg, .neg { color: var(--neg); }
   margin-bottom: 14px;
   position: relative;
 }
-.nw-hero.category-breakout { background: var(--hero-green); color: var(--hero-green-ink); }
-.nw-hero.category-conversation_starter { background: var(--hero-green); color: var(--hero-green-ink); }
-.nw-hero.category-reach_outlier { background: var(--hero-yellow); color: var(--hero-yellow-ink); }
-.nw-hero.category-flop, .nw-hero.category-served_but_fell_flat { background: var(--hero-pink); color: var(--hero-pink-ink); }
+/* Hero color per category — the color reinforces the lesson type */
+.nw-hero.category-breakout              { background: var(--hero-green);  color: var(--hero-green-ink); }
+.nw-hero.category-conversation_catalyst { background: var(--hero-green);  color: var(--hero-green-ink); }
+.nw-hero.category-quiet_winner          { background: var(--hero-blue);   color: var(--hero-blue-ink); }
+.nw-hero.category-served_but_flat       { background: var(--hero-pink);   color: var(--hero-pink-ink); }
+.nw-hero.category-reply_magnet          { background: var(--hero-green);  color: var(--hero-green-ink); }
+.nw-hero.category-format_win            { background: var(--hero-yellow); color: var(--hero-yellow-ink); }
+.nw-hero.category-unexpected_short_hit  { background: var(--hero-yellow); color: var(--hero-yellow-ink); }
+.nw-hero.category-high_effort_flop      { background: var(--hero-coral);  color: var(--hero-coral-ink); }
+
+/* Category lesson frame — the small italic sentence explaining what you can learn */
+.nw-lesson {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 14px;
+  background: var(--surface-sunken);
+  border-radius: 10px;
+  margin: 8px 0 12px;
+}
+.nw-hero .nw-lesson {
+  background: rgba(13, 13, 15, 0.12);
+  color: inherit;
+  opacity: 0.9;
+}
 
 .nw-hero .nw-head { color: inherit; opacity: 0.82; margin-bottom: 14px; }
 .nw-hero .nw-category { background: rgba(13, 13, 15, 0.1); color: inherit; }

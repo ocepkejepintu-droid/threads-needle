@@ -24,6 +24,24 @@ from .models import ContentPattern, GeneratedIdea, Topic, YouProfile
 log = logging.getLogger(__name__)
 
 
+def should_generate_ideas(session: Session, threshold: int = 10) -> bool:
+    """Check if we should generate new content ideas.
+
+    Args:
+        session: SQLAlchemy session
+        threshold: Minimum number of draft ideas to maintain
+
+    Returns:
+        True if draft ideas count is below threshold
+    """
+    from sqlalchemy import func
+
+    draft_count = session.scalar(
+        select(func.count(GeneratedIdea.id)).where(GeneratedIdea.status == "draft")
+    )
+    return (draft_count or 0) < threshold
+
+
 # =============================================================================
 # System Prompt
 # =============================================================================

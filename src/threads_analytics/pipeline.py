@@ -29,6 +29,12 @@ from .threads_client import ThreadsClient
 from .topics import extract_and_persist_topics
 from .you import generate_you_profile
 from .leads_search import run_lead_searches
+from .leads_intent import classify_lead_intent
+from .leads_scoring import calculate_lead_score, save_lead_score, get_quality_tier
+from .growth_patterns import extract_patterns
+from .growth_generator import generate_content_ideas, should_generate_ideas
+from .models import Lead
+from sqlalchemy import select
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +68,38 @@ def run_full_cycle() -> dict:
             except Exception as exc:
                 log.warning("Lead search failed: %s", exc)
                 summary["leads_error"] = repr(exc)
+
+            # 2c. Lead intent classification and scoring
+            try:
+                with session_scope() as session:
+                    # Get new leads that need intent classification
+                    new_leads = session.scalars(
+                        select(Lead).where(Lead.status == "new")
+                    ).all()
+
+                    # Classify intent for new leads
+                    for lead in new_leads:
+                        if not lead.intent:
+                            result = classify_lead_intent(
+                                lead.post_text, lead.author_bio, lead.matched_keyword
+                            )
+                            lead.intent = result["intent"]
+                            lead.intent_confidence = result["confidence"]
+
+                    # Score new leads
+                    for lead in new_leads:
+                        if not lead.score:
+                            score = calculate_lead_score(lead)
+                            tier = get_quality_tier(score)
+                            save_lead_score(session, lead, score, tier)
+
+                    summary["leads_intent_classified"] = len(
+                        [l for l in new_leads if l.intent]
+                    )
+                    summary["leads_scored"] = len([l for l in new_leads if l.score])
+            except Exception as exc:
+                log.warning("Lead intent/scoring failed: %s", exc)
+                summary["leads_scoring_error"] = repr(exc)
 
             # 3. Affinity (still locked in dev mode; returns quickly)
             with session_scope() as session:
@@ -132,6 +170,28 @@ def run_full_cycle() -> dict:
         except Exception as exc:  # noqa: BLE001
             log.warning("noteworthy commentary failed: %s", exc)
             summary["noteworthy_error"] = repr(exc)
+
+        # 11. Weekly pattern extraction (only run on Sundays)
+        if datetime.now(timezone.utc).weekday() == 6:
+            try:
+                with session_scope() as session:
+                    patterns = extract_patterns(session)
+                    summary["patterns_extracted"] = len(patterns)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Pattern extraction failed: %s", exc)
+                summary["patterns_extraction_error"] = repr(exc)
+
+        # 12. Daily content idea generation
+        try:
+            with session_scope() as session:
+                if should_generate_ideas(session, threshold=10):
+                    ideas = generate_content_ideas(session, count=5)
+                    summary["ideas_generated"] = len(ideas)
+                else:
+                    summary["ideas_generated"] = 0
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Idea generation failed: %s", exc)
+            summary["ideas_generation_error"] = repr(exc)
 
         with session_scope() as session:
             run = session.get(Run, run_id)

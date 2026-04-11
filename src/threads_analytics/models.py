@@ -396,3 +396,90 @@ class RecommendationOutcome(Base):
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     recommendation: Mapped[Recommendation] = relationship(back_populates="outcomes")
+
+
+class LeadSource(Base):
+    """Configuration for lead search keywords."""
+
+    __tablename__ = "lead_sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    search_frequency_hours: Mapped[int] = mapped_column(default=24)
+    last_searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="source")
+
+
+class Lead(Base):
+    """Discovered lead opportunity from keyword search."""
+
+    __tablename__ = "leads"
+    __table_args__ = (
+        # Prevent re-contacting same person same day
+        UniqueConstraint("author_user_id", "created_at", name="uq_lead_author_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("lead_sources.id"))
+
+    # Thread/Post info
+    thread_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    author_username: Mapped[str] = mapped_column(String(256), nullable=False)
+    author_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    post_text: Mapped[str] = mapped_column(Text, nullable=False)
+    post_permalink: Mapped[str] = mapped_column(String(512))
+    post_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    # Matching
+    matched_keyword: Mapped[str] = mapped_column(String(256), nullable=False)
+
+    # Workflow status: new, reviewed, approved, sent, rejected
+    status: Mapped[str] = mapped_column(String(32), default="new")
+
+    # AI-generated content
+    ai_draft_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_draft_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Final content (editable by user)
+    final_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationship
+    source: Mapped["LeadSource"] = relationship("LeadSource", back_populates="leads")
+
+
+class LeadSearchLog(Base):
+    """Audit log for lead searches."""
+
+    __tablename__ = "lead_search_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("lead_sources.id"))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
+    keywords_searched: Mapped[list[str]] = mapped_column(JSON, default=list)
+    posts_found: Mapped[int] = mapped_column(default=0)
+    leads_created: Mapped[int] = mapped_column(default=0)
+    searched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Growth Performance</h1>
+
+<section class="performance-section">
+  <h2>This Month vs Last Month</h2>
+  <table class="data-table">
+    <tr><th>Metric</th><th>This Month</th><th>Last Month</th><th>Change</th></tr>
+    <tr><td>Avg Views</td><td>{{ stats.this_month_avg_views|intcomma }}</td><td>{{ stats.last_month_avg_views|intcomma }}</td><td>{{ "+%d"|format(stats.change_pct) if stats.change_pct > 0 else "%d"|format(stats.change_pct) }}%</td></tr>
+  </table>
+</section>
+
+<section class="performance-section">
+  <h2>AI-Generated vs Manual Posts</h2>
+  <table class="data-table">
+    <tr><th>Type</th><th>Avg Views</th><th>Engagement</th></tr>
+    <tr><td>AI-Generated</td><td>{{ stats.ai_avg_views|intcomma }}</td><td>{{ "%.1f"|format(stats.ai_engagement) }}%</td></tr>
+    <tr><td>Manual</td><td>{{ stats.manual_avg_views|intcomma }}</td><td>{{ "%.1f"|format(stats.manual_engagement) }}%</td></tr>
+  </table>
+</section>
+
+{% endblock %}

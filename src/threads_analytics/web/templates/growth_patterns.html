@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Your Winning Patterns</h1>
+
+{% for pattern_type, patterns in patterns_by_type.items() %}
+<section class="pattern-section">
+  <h2>{{ pattern_type|title }}s ({{ patterns|length }})</h2>
+  
+  {% for pattern in patterns %}
+  <div class="pattern-card">
+    <div class="pattern-header">
+      <h3>{{ pattern.pattern_name }}</h3>
+      <span class="confidence">{{ "%.0f"|format(pattern.confidence_score * 100) }}% confidence</span>
+    </div>
+    
+    <p class="pattern-description">{{ pattern.description }}</p>
+    
+    <div class="pattern-stats">
+      <span>Used in {{ pattern.example_count }} posts</span>
+      <span>Avg views: {{ pattern.avg_views|intcomma }}</span>
+      <span>Success rate: {{ "%.0f"|format(pattern.success_rate * 100) }}%</span>
+    </div>
+    
+    <div class="pattern-examples">
+      <h4>Examples:</h4>
+      {% for example in pattern.examples[:2] %}
+      <blockquote>{{ example.text[:100] }}...</blockquote>
+      {% endfor %}
+    </div>
+    
+    <button class="btn btn-secondary generate-btn" data-pattern="{{ pattern.id }}">
+      Generate Ideas Like This
+    </button>
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+
+{% endblock %}

@@ -242,20 +242,25 @@ def get_conversion_funnel(session) -> dict:
 def get_intent_distribution(session) -> dict[str, int]:
     """Get distribution of lead intents."""
     from sqlalchemy import func
+    from sqlalchemy.exc import OperationalError
     
-    rows = session.execute(
-        select(Lead.intent, func.count(Lead.id))
-        .group_by(Lead.intent)
-    ).all()
-    
-    # Build distribution dict
-    distribution: dict[str, int] = {}
-    for intent, count in rows:
-        key = intent or "uncategorized"
-        distribution[key] = count
-    
-    # Sort by count descending
-    return dict(sorted(distribution.items(), key=lambda x: x[1], reverse=True))
+    try:
+        rows = session.execute(
+            select(Lead.intent, func.count(Lead.id))
+            .group_by(Lead.intent)
+        ).all()
+        
+        # Build distribution dict
+        distribution: dict[str, int] = {}
+        for intent, count in rows:
+            key = intent or "uncategorized"
+            distribution[key] = count
+        
+        # Sort by count descending
+        return dict(sorted(distribution.items(), key=lambda x: x[1], reverse=True))
+    except OperationalError:
+        # Column may not exist yet (schema not migrated)
+        return {}
 
 
 def _format_delta(delta: float | None) -> dict:

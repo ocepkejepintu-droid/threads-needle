@@ -446,6 +446,12 @@ class Lead(Base):
     # Matching
     matched_keyword: Mapped[str] = mapped_column(String(256), nullable=False)
 
+    # Intent classification (set by Lead Engine v2)
+    intent: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )  # "job_seeker", "founder", "service_buyer", "other", "unclear"
+    intent_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     # Engagement
     reply_count: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -487,6 +493,35 @@ class LeadSearchLog(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class LeadScore(Base):
+    """Computed score for a lead based on multiple signals.
+
+    Tracks the scoring history with individual component scores for analysis.
+    """
+
+    __tablename__ = "lead_scores"
+
+    lead_id: Mapped[int] = mapped_column(
+        ForeignKey("leads.id"), primary_key=True
+    )
+
+    # Individual signal scores (0-100)
+    intent_score: Mapped[int] = mapped_column(Integer, default=0)
+    engagement_score: Mapped[int] = mapped_column(Integer, default=0)
+    profile_score: Mapped[int] = mapped_column(Integer, default=0)
+    recency_score: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Composite
+    total_score: Mapped[int] = mapped_column(Integer, default=0)
+    quality_tier: Mapped[str] = mapped_column(
+        String(16), default="low"
+    )  # "high" | "medium" | "low"
+
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
 
 # =============================================================================

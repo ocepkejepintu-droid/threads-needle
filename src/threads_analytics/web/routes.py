@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, func, select
 
 from ..config import get_settings
 from ..db import session_scope
@@ -21,6 +21,8 @@ from ..experiments import (
     personal_category_performance,
     start_experiment,
 )
+from ..leads import generate_reply_draft, send_reply
+from ..leads_search import run_lead_searches
 from ..metrics import METRIC_META, METRIC_ORDER, compute_ground_truth
 from ..models import (
     AffinityCreator,
@@ -29,6 +31,9 @@ from ..models import (
     Experiment,
     ExperimentPostClassification,
     ExperimentVerdict,
+    Lead,
+    LeadSearchLog,
+    LeadSource,
     MyAccountInsight,
     MyPost,
     MyPostInsight,
@@ -689,7 +694,268 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             }
         )
 
+    # ---------- leads ----------
+
+    @router.get("/leads", response_class=HTMLResponse)
+    def leads_index(request: Request) -> HTMLResponse:
+        """Kanban queue page showing leads by status."""
+        with session_scope() as session:
+            new_leads = _leads_by_status(session, "new")
+            reviewed_leads = _leads_by_status(session, "reviewed")
+            approved_leads = _leads_by_status(session, "approved")
+            sent_leads = _leads_by_status(session, "sent")
+            rejected_leads = _leads_by_status(session, "rejected")
+            
+        return templates.TemplateResponse(
+            request,
+            "leads.html",
+            {
+                "new_leads": new_leads,
+                "reviewed_leads": reviewed_leads,
+                "approved_leads": approved_leads,
+                "sent_leads": sent_leads,
+                "rejected_leads": rejected_leads,
+            },
+        )
+
+    @router.get("/leads/{lead_id}", response_class=HTMLResponse)
+    def lead_detail(request: Request, lead_id: int) -> HTMLResponse:
+        """Lead detail page."""
+        with session_scope() as session:
+            lead = session.get(Lead, lead_id)
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            
+            # Get source info
+            source = session.get(LeadSource, lead.source_id)
+            
+            payload = {
+                "id": lead.id,
+                "author_username": lead.author_username,
+                "author_bio": lead.author_bio,
+                "post_text": lead.post_text,
+                "post_permalink": lead.post_permalink,
+                "post_created_at": lead.post_created_at,
+                "matched_keyword": lead.matched_keyword,
+                "status": lead.status,
+                "ai_draft_reply": lead.ai_draft_reply,
+                "ai_draft_generated_at": lead.ai_draft_generated_at,
+                "final_reply": lead.final_reply,
+                "notes": lead.notes,
+                "created_at": lead.created_at,
+                "reviewed_at": lead.reviewed_at,
+                "sent_at": lead.sent_at,
+                "rejected_at": lead.rejected_at,
+                "source_name": source.name if source else "Unknown",
+            }
+            
+        return templates.TemplateResponse(
+            request,
+            "lead_detail.html",
+            {"lead": payload},
+        )
+
+    @router.post("/leads/{lead_id}/regenerate")
+    def lead_regenerate(lead_id: int) -> RedirectResponse:
+        """Regenerate AI draft for a lead."""
+        with session_scope() as session:
+            lead = session.get(Lead, lead_id)
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            
+            # Only allow regeneration for leads not yet sent or rejected
+            if lead.status in ("sent", "rejected"):
+                raise HTTPException(400, "cannot regenerate draft for sent or rejected lead")
+            
+            # Generate new draft
+            draft = generate_reply_draft(lead)
+            lead.ai_draft_reply = draft
+            lead.ai_draft_generated_at = datetime.now(timezone.utc)
+            
+        return RedirectResponse(f"/leads/{lead_id}", status_code=303)
+
+    @router.post("/leads/{lead_id}/save-draft")
+    def lead_save_draft(
+        lead_id: int,
+        draft_text: str = Form(...),
+    ) -> RedirectResponse:
+        """Save edited draft (with 280 char limit)."""
+        # Enforce 280 char limit
+        if len(draft_text) > 280:
+            raise HTTPException(400, "reply exceeds 280 character limit")
+        
+        with session_scope() as session:
+            lead = session.get(Lead, lead_id)
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            
+            if lead.status in ("sent", "rejected"):
+                raise HTTPException(400, "cannot edit draft for sent or rejected lead")
+            
+            lead.final_reply = draft_text
+            lead.reviewed_at = datetime.now(timezone.utc)
+            if lead.status == "new":
+                lead.status = "reviewed"
+            
+        return RedirectResponse(f"/leads/{lead_id}", status_code=303)
+
+    @router.post("/leads/{lead_id}/approve")
+    def lead_approve(lead_id: int) -> RedirectResponse:
+        """Approve and send reply to lead."""
+        from ..threads_client import ThreadsClient
+        
+        with session_scope() as session:
+            lead = session.get(Lead, lead_id)
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            
+            if lead.status in ("sent", "rejected"):
+                raise HTTPException(400, "lead already processed")
+            
+            # Check daily reply limit
+            today_start = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            sent_today = (
+                session.scalar(
+                    select(func.count())
+                    .select_from(Lead)
+                    .where(and_(Lead.status == "sent", Lead.sent_at >= today_start))
+                )
+                or 0
+            )
+            
+            settings = get_settings()
+            daily_limit = getattr(settings, "daily_reply_limit", 50)
+            if sent_today >= daily_limit:
+                raise HTTPException(429, f"daily reply limit reached ({daily_limit})")
+            
+            # Use final_reply if edited, otherwise use AI draft
+            reply_text = lead.final_reply or lead.ai_draft_reply
+            if not reply_text:
+                raise HTTPException(400, "no reply text available")
+            
+            # Send the reply
+            try:
+                send_reply(lead, reply_text)
+            except RuntimeError as exc:
+                raise HTTPException(500, f"failed to send reply: {exc}") from exc
+            
+            # Update lead status
+            lead.status = "sent"
+            lead.sent_at = datetime.now(timezone.utc)
+            if lead.final_reply is None:
+                lead.final_reply = reply_text
+            
+        return RedirectResponse(f"/leads/{lead_id}", status_code=303)
+
+    @router.post("/leads/{lead_id}/reject")
+    def lead_reject(lead_id: int) -> RedirectResponse:
+        """Reject a lead."""
+        with session_scope() as session:
+            lead = session.get(Lead, lead_id)
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            
+            if lead.status == "sent":
+                raise HTTPException(400, "cannot reject already sent lead")
+            
+            lead.status = "rejected"
+            lead.rejected_at = datetime.now(timezone.utc)
+            
+        return RedirectResponse("/leads", status_code=303)
+
+    @router.get("/leads/sources", response_class=HTMLResponse)
+    def lead_sources_index(request: Request) -> HTMLResponse:
+        """List keyword sources."""
+        with session_scope() as session:
+            sources = session.scalars(
+                select(LeadSource).order_by(LeadSource.created_at.desc())
+            ).all()
+            payload = [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "keywords": s.keywords,
+                    "is_active": s.is_active,
+                    "search_frequency_hours": s.search_frequency_hours,
+                    "last_searched_at": s.last_searched_at,
+                    "created_at": s.created_at,
+                }
+                for s in sources
+            ]
+            
+        return templates.TemplateResponse(
+            request,
+            "lead_sources.html",
+            {"sources": payload},
+        )
+
+    @router.get("/leads/sources/new", response_class=HTMLResponse)
+    def lead_source_new_form(request: Request) -> HTMLResponse:
+        """Create source form."""
+        return templates.TemplateResponse(
+            request,
+            "lead_source_new.html",
+            {},
+        )
+
+    @router.post("/leads/sources")
+    def lead_source_create(
+        name: str = Form(...),
+        keywords: str = Form(...),
+        search_frequency_hours: int = Form(24),
+    ) -> RedirectResponse:
+        """Create a new lead source."""
+        # Parse keywords (comma or newline separated)
+        keyword_list = [
+            k.strip() for k in keywords.replace("\n", ",").split(",") if k.strip()
+        ]
+        
+        if not keyword_list:
+            raise HTTPException(400, "at least one keyword is required")
+        
+        with session_scope() as session:
+            source = LeadSource(
+                name=name,
+                keywords=keyword_list,
+                search_frequency_hours=search_frequency_hours,
+                is_active=True,
+            )
+            session.add(source)
+            session.flush()
+            source_id = source.id
+            
+        return RedirectResponse("/leads/sources", status_code=303)
+
     return router
+
+
+def _leads_by_status(session, status: str, limit: int = 50) -> list[dict]:
+    """Get leads filtered by status for Kanban view."""
+    leads = session.scalars(
+        select(Lead)
+        .where(Lead.status == status)
+        .order_by(desc(Lead.created_at))
+        .limit(limit)
+    ).all()
+    return [
+        {
+            "id": lead.id,
+            "author_username": lead.author_username,
+            "author_bio": lead.author_bio,
+            "post_text": lead.post_text[:200] + "..." if len(lead.post_text) > 200 else lead.post_text,
+            "post_permalink": lead.post_permalink,
+            "post_created_at": lead.post_created_at,
+            "matched_keyword": lead.matched_keyword,
+            "status": lead.status,
+            "ai_draft_reply": lead.ai_draft_reply,
+            "final_reply": lead.final_reply,
+            "created_at": lead.created_at,
+            "reviewed_at": lead.reviewed_at,
+        }
+        for lead in leads
+    ]
 
 
 def _latest_insights_with_posts(session, limit: int = 20) -> list[dict]:

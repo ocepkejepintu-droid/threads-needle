@@ -10,9 +10,13 @@ import uvicorn
 
 from .backfill import backfill_history
 from .config import get_settings
-from .db import init_db
+from .db import init_db, session_scope
+from .leads_search import run_lead_searches
+from .models import Lead
 from .pipeline import run_full_cycle
 from .threads_client import ThreadsClient
+from sqlalchemy import func, select
+from datetime import datetime, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -108,6 +112,95 @@ def _update_env_file(key: str, value: str, path: str = ".env") -> None:
         out.append(f"{key}={value}\n")
     with open(path, "w", encoding="utf-8") as f:
         f.writelines(out)
+
+
+@app.command()
+def search_leads(
+    manual: bool = typer.Option(False, "--manual", "-m", help="Run even if not due by frequency"),
+):
+    """Manually trigger lead search across all active sources."""
+    from .threads_client import ThreadsClient
+    from .models import Run
+    
+    init_db()
+    
+    if manual:
+        typer.echo("Running manual lead search...")
+    else:
+        typer.echo("Checking lead sources...")
+    
+    with session_scope() as session:
+        run = Run(started_at=datetime.now(timezone.utc), status="running")
+        session.add(run)
+        session.flush()
+        run_id = run.id
+    
+    try:
+        with ThreadsClient() as client:
+            with session_scope() as session:
+                run = session.get(Run, run_id)
+                summary = run_lead_searches(run=run, client=client)
+        
+        with session_scope() as session:
+            run = session.get(Run, run_id)
+            run.status = "complete"
+            run.finished_at = datetime.now(timezone.utc)
+    except Exception as exc:
+        with session_scope() as session:
+            run = session.get(Run, run_id)
+            if run is not None:
+                run.status = "failed"
+                run.finished_at = datetime.now(timezone.utc)
+                run.notes = f"error: {exc!r}"[:2000]
+        raise
+    
+    typer.echo(f"Sources searched: {summary['sources_searched']}")
+    typer.echo(f"Posts found: {summary['posts_found']}")
+    typer.echo(f"Leads created: {summary['leads_created']}")
+    
+    if summary['errors']:
+        typer.echo(f"Errors: {len(summary['errors'])}", err=True)
+
+
+@app.command()
+def leads_stats():
+    """Show lead queue statistics."""
+    from .models import LeadSource
+    
+    with session_scope() as session:
+        # Count by status
+        status_counts = {}
+        for status in ["new", "reviewed", "approved", "sent", "rejected"]:
+            count = session.scalar(
+                select(func.count()).select_from(Lead).where(Lead.status == status)
+            ) or 0
+            status_counts[status] = count
+        
+        # Daily replies sent
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        sent_today = session.scalar(
+            select(func.count()).select_from(Lead).where(
+                Lead.status == "sent", Lead.sent_at >= today_start
+            )
+        ) or 0
+        
+        # Active sources
+        active_sources = session.scalar(
+            select(func.count()).select_from(LeadSource).where(LeadSource.is_active == True)
+        ) or 0
+        
+        typer.echo("Lead Finder Statistics")
+        typer.echo("=" * 40)
+        typer.echo(f"Active sources: {active_sources}")
+        typer.echo("")
+        typer.echo("Queue status:")
+        typer.echo(f"  New: {status_counts['new']}")
+        typer.echo(f"  Reviewed: {status_counts['reviewed']}")
+        typer.echo(f"  Approved: {status_counts['approved']}")
+        typer.echo(f"  Sent: {status_counts['sent']}")
+        typer.echo(f"  Rejected: {status_counts['rejected']}")
+        typer.echo("")
+        typer.echo(f"Replies sent today: {sent_today}/10")
 
 
 if __name__ == "__main__":

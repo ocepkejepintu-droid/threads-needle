@@ -126,6 +126,17 @@ class ThreadsClient:
             resp.raise_for_status()
         return resp.json()
 
+    def _post(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """POST to the Threads API using query parameters."""
+        params = dict(params or {})
+        params["access_token"] = self.access_token
+        url = f"{GRAPH_BASE}{path}"
+        resp = self._client.post(url, params=params)
+        if resp.status_code >= 400:
+            log.error("Threads API error %s: %s", resp.status_code, resp.text)
+            resp.raise_for_status()
+        return resp.json()
+
     # ---------- Own account ----------
 
     def get_me(self) -> dict[str, Any]:

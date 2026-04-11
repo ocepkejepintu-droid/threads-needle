@@ -60,7 +60,7 @@ def should_skip_post(
         return True, "own_post"
 
     # Skip posts with too many replies (likely viral, low conversion)
-    if reply_count > 10:
+    if reply_count > 50:
         return True, "too_many_replies"
 
     # Skip very short posts (likely low quality)
@@ -186,7 +186,7 @@ def send_reply(
         # The Threads API requires posting to the thread's replies endpoint
         result = client._post(
             f"/{lead.thread_id}/replies",
-            data={"text": reply_text},
+            params={"text": reply_text},
         )
 
         # Update lead status

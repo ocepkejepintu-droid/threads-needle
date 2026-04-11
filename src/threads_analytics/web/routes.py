@@ -23,6 +23,8 @@ from ..experiments import (
 )
 from ..leads import generate_reply_draft, send_reply
 from ..leads_search import run_lead_searches
+from ..models import LeadReply, ReplyTemplate
+from ..brand_validator import validate_content
 from ..metrics import METRIC_META, METRIC_ORDER, compute_ground_truth
 from ..models import (
     AffinityCreator,
@@ -45,6 +47,7 @@ from ..models import (
     YouProfile,
 )
 from ..pipeline import run_full_cycle
+from ..you import generate_you_profile
 
 _run_lock = threading.Lock()
 _last_run_summary: dict = {}
@@ -163,6 +166,98 @@ def _format_metric_value(metric_name: str, value: float | None) -> str:
     return f"{value:.2f}"
 
 
+# ---------- lead analytics helpers ----------
+
+
+def calculate_template_stats(session) -> list[dict]:
+    """Get reply template performance statistics."""
+    templates = session.scalars(
+        select(ReplyTemplate).order_by(desc(ReplyTemplate.times_used))
+    ).all()
+    
+    result = []
+    for t in templates:
+        response_rate = 0.0
+        if t.times_used > 0:
+            response_rate = t.times_responded / t.times_used
+        
+        result.append({
+            "id": t.id,
+            "name": t.name,
+            "category": t.category,
+            "times_used": t.times_used,
+            "times_responded": t.times_responded,
+            "response_rate": response_rate,
+            "is_winner": t.is_winner,
+        })
+    
+    return result
+
+
+def get_conversion_funnel(session) -> dict:
+    """Calculate conversion funnel from sent replies to clients."""
+    # Get all sent replies
+    replies = session.scalars(
+        select(LeadReply).where(LeadReply.sent_at.is_not(None))
+    ).all()
+    
+    total_sent = len(replies)
+    if total_sent == 0:
+        return {
+            "sent": 0,
+            "responded": 0,
+            "responded_rate": 0,
+            "converted_to_dm": 0,
+            "dm_rate": 0,
+            "converted_to_call": 0,
+            "call_rate": 0,
+            "converted_to_client": 0,
+            "client_rate": 0,
+        }
+    
+    responded = sum(1 for r in replies if r.has_response)
+    converted_to_dm = sum(1 for r in replies if r.converted_to_dm)
+    converted_to_call = sum(1 for r in replies if r.converted_to_call)
+    converted_to_client = sum(1 for r in replies if r.converted_to_client)
+    
+    # Calculate rates (as percentages)
+    responded_rate = round((responded / total_sent) * 100) if total_sent > 0 else 0
+    dm_rate = round((converted_to_dm / responded) * 100) if responded > 0 else 0
+    call_rate = round((converted_to_call / converted_to_dm) * 100) if converted_to_dm > 0 else 0
+    client_rate = round((converted_to_client / converted_to_call) * 100) if converted_to_call > 0 else 0
+    
+    return {
+        "sent": total_sent,
+        "responded": responded,
+        "responded_rate": responded_rate,
+        "converted_to_dm": converted_to_dm,
+        "dm_rate": dm_rate,
+        "converted_to_call": converted_to_call,
+        "call_rate": call_rate,
+        "converted_to_client": converted_to_client,
+        "client_rate": client_rate,
+    }
+
+
+def get_intent_distribution(session) -> dict[str, int]:
+    """Get distribution of lead intents."""
+    from sqlalchemy import func
+    
+    rows = session.execute(
+        select(Lead.intent, func.count(Lead.id))
+        .group_by(Lead.intent)
+    ).all()
+    
+    # Build distribution dict
+    distribution: dict[str, int] = {}
+    for intent, count in rows:
+        key = intent or "uncategorized"
+        distribution[key] = count
+    
+    # Sort by count descending
+    return dict(sorted(distribution.items(), key=lambda x: x[1], reverse=True))
+
+
 def _format_delta(delta: float | None) -> dict:
     if delta is None:
         return {"label": "—", "class": "flat"}
@@ -254,6 +349,13 @@ def _ground_truth_payload(session) -> dict:
 
 
 # ---------- router ----------
+
+
+def _get_latest_you_profile(session):
+    """Get the latest YouProfile from the database."""
+    return session.scalar(
+        select(YouProfile).order_by(desc(YouProfile.created_at)).limit(1)
+    )
 
 
 def build_router(templates: Jinja2Templates) -> APIRouter:
@@ -718,6 +820,26 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             },
         )
 
+    @router.get("/leads/analytics", response_class=HTMLResponse)
+    def leads_analytics(request: Request) -> HTMLResponse:
+        """Lead analytics dashboard."""
+        with session_scope() as session:
+            template_stats = calculate_template_stats(session)
+            funnel = get_conversion_funnel(session)
+            intents = get_intent_distribution(session)
+            total_leads = sum(intents.values()) if intents else 0
+        
+        return templates.TemplateResponse(
+            request,
+            "leads_analytics.html",
+            {
+                "templates": template_stats,
+                "funnel": funnel,
+                "intents": intents,
+                "total_leads": total_leads,
+            },
+        )
+
     # ---------- leads/sources (must be before /leads/{lead_id}) ----------
 
     @router.get("/leads/sources", response_class=HTMLResponse)
@@ -933,6 +1055,31 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         return RedirectResponse("/leads", status_code=303)
 
     
+    # ---------- brand composer ----------
+
+    @router.get("/compose", response_class=HTMLResponse)
+    def compose_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(request, "compose.html", {})
+
+    @router.post("/api/brand-check")
+    def api_brand_check(text: str = Form(...)) -> JSONResponse:
+        """AJAX endpoint for live brand checking."""
+        with session_scope() as session:
+            you_profile = _get_latest_you_profile(session)
+            if you_profile is None:
+                return JSONResponse({
+                    "score": 50,
+                    "passed": True,
+                    "violations": [],
+                    "suggestions": [{"issue": "No profile", "suggestion": "No You profile found. Run the pipeline first."}],
+                })
+            result = validate_content(text, you_profile)
+            return JSONResponse({
+                "score": result.overall_score,
+                "passed": result.passed,
+                "violations": result.protect_violations,
+                "suggestions": [{"issue": s.issue, "suggestion": s.suggestion} for s in result.suggestions],
+            })
 
     return router
 

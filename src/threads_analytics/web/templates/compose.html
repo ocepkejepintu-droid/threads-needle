@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="composer-header">
+  <h1>Brand Composer</h1>
+  <div class="brand-score-display" id="score-display">
+    Score: <span id="score-value">--</span>/100
+  </div>
+</div>
+
+<p class="muted">
+  Write with your voice. The composer checks against your 
+  <a href="/you">You profile</a> in real-time.
+</p>
+
+<div class="composer-container">
+  <!-- Textarea -->
+  <textarea 
+    id="compose-text" 
+    placeholder="Write your post..."
+    rows="10"
+  ></textarea>
+  
+  <!-- Live analysis -->
+  <div id="analysis-panel" class="analysis-panel hidden">
+    <div class="score-bar">
+      <div id="score-bar-fill" class="score-bar-fill"></div>
+    </div>
+    
+    <div class="check-results">
+      <div id="protect-check" class="check-item">
+        <span class="check-icon">✓</span>
+        <span class="check-label">Protect list: Clear</span>
+      </div>
+      <div id="voice-check" class="check-item">
+        <span class="check-icon">✓</span>
+        <span class="check-label">Voice: Aligned</span>
+      </div>
+      <div id="double-down-check" class="check-item">
+        <span class="check-icon">✓</span>
+        <span class="check-label">Double-down: Present</span>
+      </div>
+    </div>
+    
+    <div id="suggestions" class="suggestions"></div>
+  </div>
+  
+  <!-- Actions -->
+  <div class="composer-actions">
+    <button id="check-btn" class="btn btn-secondary">Check Brand Alignment</button>
+    <button id="save-draft-btn" class="btn btn-secondary">Save Draft</button>
+    <button id="schedule-btn" class="btn btn-primary" disabled>Schedule Post</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const textarea = document.getElementById('compose-text');
+  const analysisPanel = document.getElementById('analysis-panel');
+  const scoreDisplay = document.getElementById('score-value');
+  const scoreBarFill = document.getElementById('score-bar-fill');
+  const protectCheck = document.getElementById('protect-check');
+  const voiceCheck = document.getElementById('voice-check');
+  const doubleDownCheck = document.getElementById('double-down-check');
+  const suggestionsDiv = document.getElementById('suggestions');
+  const scheduleBtn = document.getElementById('schedule-btn');
+  const checkBtn = document.getElementById('check-btn');
+  
+  let debounceTimer = null;
+  
+  // Score color classes
+  function getScoreColor(score) {
+    if (score >= 90) return 'score-excellent';
+    if (score >= 70) return 'score-good';
+    if (score >= 50) return 'score-warning';
+    return 'score-danger';
+  }
+  
+  function getScoreLabel(score) {
+    if (score >= 90) return 'Strong brand alignment';
+    if (score >= 70) return 'Good, minor tweaks suggested';
+    if (score >= 50) return 'Off-brand risk';
+    return 'Significant violations';
+  }
+  
+  // Update check item display
+  function updateCheckItem(element, passed, text, details) {
+    const icon = element.querySelector('.check-icon');
+    const label = element.querySelector('.check-label');
+    
+    if (passed) {
+      element.classList.remove('check-fail');
+      element.classList.add('check-pass');
+      icon.textContent = '✓';
+    } else {
+      element.classList.remove('check-pass');
+      element.classList.add('check-fail');
+      icon.textContent = '✗';
+    }
+    label.textContent = text;
+  }
+  
+  // Update UI with analysis result
+  function updateUI(result) {
+    analysisPanel.classList.remove('hidden');
+    
+    // Score display
+    scoreDisplay.textContent = result.score;
+    scoreDisplay.className = getScoreColor(result.score);
+    
+    // Score bar
+    scoreBarFill.style.width = result.score + '%';
+    scoreBarFill.className = 'score-bar-fill ' + getScoreColor(result.score);
+    
+    // Check items
+    const violations = result.violations || [];
+    updateCheckItem(
+      protectCheck,
+      violations.length === 0,
+      violations.length === 0 ? 'Protect list: Clear' : `Protect list: ${violations.length} violation${violations.length > 1 ? 's' : ''}`,
+      violations
+    );
+    
+    updateCheckItem(
+      voiceCheck,
+      result.score >= 70,
+      result.score >= 70 ? 'Voice: Aligned' : 'Voice: Needs adjustment',
+      null
+    );
+    
+    updateCheckItem(
+      doubleDownCheck,
+      result.score >= 70,
+      result.score >= 70 ? 'Double-down: Present' : 'Double-down: Missing',
+      null
+    );
+    
+    // Suggestions
+    suggestionsDiv.innerHTML = '';
+    if (result.suggestions && result.suggestions.length > 0) {
+      const suggestionsHeader = document.createElement('div');
+      suggestionsHeader.className = 'suggestions-header';
+      suggestionsHeader.textContent = 'Suggestions';
+      suggestionsDiv.appendChild(suggestionsHeader);
+      
+      result.suggestions.forEach(function(sugg) {
+        const card = document.createElement('div');
+        card.className = 'suggestion-card';
+        
+        const issue = document.createElement('div');
+        issue.className = 'suggestion-issue';
+        issue.textContent = sugg.issue;
+        
+        const suggestion = document.createElement('div');
+        suggestion.className = 'suggestion-text';
+        suggestion.textContent = sugg.suggestion;
+        
+        card.appendChild(issue);
+        card.appendChild(suggestion);
+        suggestionsDiv.appendChild(card);
+      });
+    }
+    
+    // Enable/disable schedule button
+    scheduleBtn.disabled = result.score < 70;
+    if (result.score < 70) {
+      scheduleBtn.title = 'Score must be 70+ to schedule';
+    } else {
+      scheduleBtn.title = '';
+    }
+  }
+  
+  // Run brand check
+  function runBrandCheck() {
+    const text = textarea.value.trim();
+    
+    if (text.length < 10) {
+      analysisPanel.classList.add('hidden');
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('text', text);
+    
+    fetch('/api/brand-check', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      updateUI(data);
+    })
+    .catch(function(err) {
+      console.error('Brand check failed:', err);
+    });
+  }
+  
+  // Debounced analysis
+  function debouncedCheck() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(runBrandCheck, 500);
+  }
+  
+  // Event listeners
+  textarea.addEventListener('input', debouncedCheck);
+  
+  checkBtn.addEventListener('click', function() {
+    runBrandCheck();
+  });
+  
+  saveDraftBtn.addEventListener('click', function() {
+    const text = textarea.value.trim();
+    if (!text) return;
+    
+    // Save to localStorage for now
+    const drafts = JSON.parse(localStorage.getItem('composer_drafts') || '[]');
+    drafts.push({
+      text: text,
+      saved_at: new Date().toISOString()
+    });
+    localStorage.setItem('composer_drafts', JSON.stringify(drafts));
+    
+    const btn = document.getElementById('save-draft-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Saved!';
+    setTimeout(function() {
+      btn.textContent = originalText;
+    }, 1500);
+  });
+  
+  scheduleBtn.addEventListener('click', function() {
+    const text = textarea.value.trim();
+    if (!text) return;
+    
+    // For now, just show a message
+    alert('Scheduling integration coming soon!\n\nPost preview:\n' + text.substring(0, 100) + '...');
+  });
+})();
+</script>
+
+<style>
+.composer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.brand-score-display {
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 8px;
+}
+
+#score-value {
+  transition: color 0.3s ease;
+}
+
+.score-excellent { color: #22c55e; }
+.score-good { color: #84cc16; }
+.score-warning { color: #f59e0b; }
+.score-danger { color: #ef4444; }
+
+.composer-container {
+  max-width: 800px;
+}
+
+#compose-text {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  border: 2px solid var(--border-color, #e5e5e5);
+  border-radius: 12px;
+  resize: vertical;
+  min-height: 200px;
+  font-family: inherit;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111);
+  transition: border-color 0.2s ease;
+}
+
+#compose-text:focus {
+  outline: none;
+  border-color: var(--accent-color, #6366f1);
+}
+
+.analysis-panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e5e5e5);
+}
+
+.analysis-panel.hidden {
+  display: none;
+}
+
+.score-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary, #e5e5e5);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease, background-color 0.3s ease;
+  background-color: #9ca3af;
+}
+
+.score-bar-fill.score-excellent { background-color: #22c55e; }
+.score-bar-fill.score-good { background-color: #84cc16; }
+.score-bar-fill.score-warning { background-color: #f59e0b; }
+.score-bar-fill.score-danger { background-color: #ef4444; }
+
+.check-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.check-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.check-pass .check-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.check-fail .check-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.check-pass .check-label {
+  color: var(--text-primary, #111);
+}
+
+.check-fail .check-label {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.suggestions {
+  margin-top: 1rem;
+}
+
+.suggestions-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.suggestion-card {
+  padding: 0.875rem;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.suggestion-issue {
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.suggestion-text {
+  color: var(--text-secondary, #666);
+  font-size: 0.875rem;
+}
+
+.composer-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.composer-actions .btn {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.composer-actions .btn-secondary {
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #111);
+  border-color: var(--border-color, #e5e5e5);
+}
+
+.composer-actions .btn-secondary:hover {
+  background: var(--bg-tertiary, #e5e5e5);
+}
+
+.composer-actions .btn-primary {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+
+.composer-actions .btn-primary:hover:not(:disabled) {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.composer-actions .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .composer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .check-results {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .composer-actions {
+    flex-direction: column;
+  }
+  
+  .composer-actions .btn {
+    width: 100%;
+  }
+}
+</style>
+
+{% endblock %}

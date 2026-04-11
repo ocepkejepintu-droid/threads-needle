@@ -718,6 +718,73 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             },
         )
 
+    # ---------- leads/sources (must be before /leads/{lead_id}) ----------
+
+    @router.get("/leads/sources", response_class=HTMLResponse)
+    def lead_sources_index(request: Request) -> HTMLResponse:
+        """List keyword sources."""
+        with session_scope() as session:
+            sources = session.scalars(
+                select(LeadSource).order_by(LeadSource.created_at.desc())
+            ).all()
+            payload = [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "keywords": s.keywords,
+                    "is_active": s.is_active,
+                    "search_frequency_hours": s.search_frequency_hours,
+                    "last_searched_at": s.last_searched_at,
+                    "created_at": s.created_at,
+                }
+                for s in sources
+            ]
+            
+        return templates.TemplateResponse(
+            request,
+            "lead_sources.html",
+            {"sources": payload},
+        )
+
+    @router.get("/leads/sources/new", response_class=HTMLResponse)
+    def lead_source_new_form(request: Request) -> HTMLResponse:
+        """Create source form."""
+        return templates.TemplateResponse(
+            request,
+            "lead_source_new.html",
+            {},
+        )
+
+    @router.post("/leads/sources")
+    def lead_source_create(
+        name: str = Form(...),
+        keywords: str = Form(...),
+        search_frequency_hours: int = Form(24),
+    ) -> RedirectResponse:
+        """Create a new lead source."""
+        # Parse keywords (comma or newline separated)
+        keyword_list = [
+            k.strip() for k in keywords.replace("\n", ",").split(",") if k.strip()
+        ]
+        
+        if not keyword_list:
+            raise HTTPException(400, "at least one keyword is required")
+        
+        with session_scope() as session:
+            source = LeadSource(
+                name=name,
+                keywords=keyword_list,
+                search_frequency_hours=search_frequency_hours,
+                is_active=True,
+            )
+            session.add(source)
+            session.flush()
+            source_id = source.id
+            
+        return RedirectResponse("/leads/sources", status_code=303)
+
+    # ---------- lead detail ----------
+
     @router.get("/leads/{lead_id}", response_class=HTMLResponse)
     def lead_detail(request: Request, lead_id: int) -> HTMLResponse:
         """Lead detail page."""
@@ -865,68 +932,7 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
             
         return RedirectResponse("/leads", status_code=303)
 
-    @router.get("/leads/sources", response_class=HTMLResponse)
-    def lead_sources_index(request: Request) -> HTMLResponse:
-        """List keyword sources."""
-        with session_scope() as session:
-            sources = session.scalars(
-                select(LeadSource).order_by(LeadSource.created_at.desc())
-            ).all()
-            payload = [
-                {
-                    "id": s.id,
-                    "name": s.name,
-                    "keywords": s.keywords,
-                    "is_active": s.is_active,
-                    "search_frequency_hours": s.search_frequency_hours,
-                    "last_searched_at": s.last_searched_at,
-                    "created_at": s.created_at,
-                }
-                for s in sources
-            ]
-            
-        return templates.TemplateResponse(
-            request,
-            "lead_sources.html",
-            {"sources": payload},
-        )
-
-    @router.get("/leads/sources/new", response_class=HTMLResponse)
-    def lead_source_new_form(request: Request) -> HTMLResponse:
-        """Create source form."""
-        return templates.TemplateResponse(
-            request,
-            "lead_source_new.html",
-            {},
-        )
-
-    @router.post("/leads/sources")
-    def lead_source_create(
-        name: str = Form(...),
-        keywords: str = Form(...),
-        search_frequency_hours: int = Form(24),
-    ) -> RedirectResponse:
-        """Create a new lead source."""
-        # Parse keywords (comma or newline separated)
-        keyword_list = [
-            k.strip() for k in keywords.replace("\n", ",").split(",") if k.strip()
-        ]
-        
-        if not keyword_list:
-            raise HTTPException(400, "at least one keyword is required")
-        
-        with session_scope() as session:
-            source = LeadSource(
-                name=name,
-                keywords=keyword_list,
-                search_frequency_hours=search_frequency_hours,
-                is_active=True,
-            )
-            session.add(source)
-            session.flush()
-            source_id = source.id
-            
-        return RedirectResponse("/leads/sources", status_code=303)
+    
 
     return router
 

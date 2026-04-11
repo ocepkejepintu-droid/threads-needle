@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Brand Health Report</h1>
+<p class="muted">
+  Weekly analysis of your content against brand guidelines. Tracks voice consistency,
+  protect list compliance, and double-down element usage.
+</p>
+
+{% if report %}
+  <p class="report-period muted">{{ report.week_start }} — {{ report.week_end }}</p>
+
+  <div class="page-grid">
+
+    <!-- Summary Cards -->
+    <section class="span-2 card card-hero card-hero-blue">
+      <h2>Average Score</h2>
+      <div class="score-display">
+        <span class="score-value {% if report.avg_score >= 70 %}score-good{% elif report.avg_score >= 60 %}score-warning{% else %}score-bad{% endif %}">
+          {{ report.avg_score }}
+        </span>
+        <span class="score-max">/100</span>
+      </div>
+      <p class="muted small">Based on {{ report.posts_analyzed }} posts this week</p>
+    </section>
+
+    <section class="span-2 card">
+      <h2>Pass Rate</h2>
+      <div class="pass-rate-display">
+        {% set total = report.passed + report.failed %}
+        {% if total > 0 %}
+          {% set pass_rate = (report.passed / total * 100) | int %}
+          <span class="pass-rate-value {% if pass_rate >= 70 %}score-good{% elif pass_rate >= 50 %}score-warning{% else %}score-bad{% endif %}">
+            {{ pass_rate }}%
+          </span>
+          <div class="pass-rate-bar">
+            <div class="pass-rate-fill" style="width: {{ pass_rate }}%"></div>
+          </div>
+          <p class="muted small">{{ report.passed }} passed, {{ report.failed }} failed</p>
+        {% else %}
+          <span class="pass-rate-value">—</span>
+          <p class="muted small">No posts analyzed</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Score Trend -->
+    <section class="span-4 card">
+      <h2>Score Trend (7 Days)</h2>
+      <div class="trend-chart" role="img" aria-label="Daily brand score trend">
+        {% for score in report.score_trend %}
+          <div class="trend-bar-wrapper" title="{{ score }}/100">
+            <div class="trend-bar {% if score >= 70 %}trend-good{% elif score >= 60 %}trend-warning{% else %}trend-bad{% endif %}" 
+                 style="height: {{ score }}%"
+                 data-score="{{ score }}"></div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="trend-labels">
+        <span class="muted small">7 days ago</span>
+        <span class="muted small">Today</span>
+      </div>
+    </section>
+
+    <!-- Top Violations -->
+    <section class="span-2 card">
+      <h2>Top Violations</h2>
+      {% if report.top_violations %}
+        <div class="violations-list">
+          {% for v in report.top_violations %}
+            <div class="violation-item">
+              <span class="violation-type">{{ v.type }}</span>
+              <span class="violation-count">{{ v.count }}×</span>
+            </div>
+          {% endfor %n        </div>
+      {% else %}
+        <p class="muted small">No violations detected this week. Great job!</p>
+      {% endif %}
+    </section>
+
+    <!-- Recommendations -->
+    <section class="span-2 card">
+      <h2>Recommendations</h2>
+      {% if report.recommendations %}
+        <ul class="recommendations-list">
+          {% for rec in report.recommendations %}
+            <li>{{ rec }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted small">No recommendations at this time.</p>
+      {% endif %}
+    </section>
+
+  </div>
+
+{% else %}
+  <p class="muted">No brand health data available. Run the pipeline to generate your first report.</p>
+{% endif %}
+
+<style>
+.report-period {
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.score-display {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin: 1rem 0;
+}
+
+.score-value {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-max {
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.score-good { color: var(--ok); }
+.score-warning { color: var(--warning); }
+.score-bad { color: var(--bad); }
+
+.pass-rate-display {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.pass-rate-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.pass-rate-bar {
+  height: 8px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.pass-rate-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--accent));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding: 1rem 0;
+  margin: 1rem 0;
+}
+
+.trend-bar-wrapper {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+}
+
+.trend-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+}
+
+.trend-good { background: var(--ok); }
+.trend-warning { background: var(--warning); }
+.trend-bad { background: var(--bad); }
+
+.trend-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.violations-list {
+  margin-top: 1rem;
+}
+
+.violation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--panel-2);
+}
+
+.violation-item:last-child {
+  border-bottom: none;
+}
+
+.violation-type {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.violation-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--bad);
+  background: rgba(244, 63, 94, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.recommendations-list {
+  margin-top: 1rem;
+  padding-left: 1.25rem;
+}
+
+.recommendations-list li {
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.recommendations-list li::marker {
+  color: var(--accent);
+}
+</style>
+
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="experiments-header">
+  <h1>Leads</h1>
+  <div style="display: flex; gap: 12px; align-items: center;">
+    <span class="muted" id="reply-limit">{{ sent_today }}/{{ daily_limit }} replies today</span>
+    <a class="cta" href="/lead-sources">Manage Sources</a>
+  </div>
+</div>
+
+{% if not active_sources %}
+<div class="banner">
+  No active lead sources. <a href="/lead-sources">Create a source</a> to start finding leads.
+</div>
+{% endif %}
+
+<div class="kanban-grid">
+  <!-- New Column -->
+  <div class="kanban-column">
+    <div class="kanban-header">
+      <h2>New</h2>
+      <span class="kanban-count">{{ new_leads | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for lead in new_leads %}
+      <a href="/leads/{{ lead.id }}" class="lead-card">
+        <div class="lead-card-header">
+          <span class="lead-username">@{{ lead.username }}</span>
+          <span class="lead-time">{{ lead.created_at | time_ago }}</span>
+        </div>
+        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <div class="lead-footer">
+          <span class="lead-keyword">{{ lead.matched_keyword }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Reviewed Column -->
+  <div class="kanban-column">
+    <div class="kanban-header">
+      <h2>Reviewed</h2>
+      <span class="kanban-count">{{ reviewed_leads | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for lead in reviewed_leads %}
+      <a href="/leads/{{ lead.id }}" class="lead-card">
+        <div class="lead-card-header">
+          <span class="lead-username">@{{ lead.username }}</span>
+          <span class="lead-time">{{ lead.reviewed_at | time_ago }}</span>
+        </div>
+        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <div class="lead-footer">
+          <span class="lead-keyword">{{ lead.matched_keyword }}</span>
+          {% if lead.ai_draft %}
+          <span class="draft-badge">draft</span>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Sent Column -->
+  <div class="kanban-column">
+    <div class="kanban-header">
+      <h2>Sent</h2>
+      <span class="kanban-count">{{ sent_leads | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for lead in sent_leads %}
+      <a href="/leads/{{ lead.id }}" class="lead-card lead-sent">
+        <div class="lead-card-header">
+          <span class="lead-username">@{{ lead.username }}</span>
+          <span class="lead-time">{{ lead.sent_at | time_ago }}</span>
+        </div>
+        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <div class="lead-footer">
+          <span class="lead-keyword">{{ lead.matched_keyword }}</span>
+          <span class="sent-badge">✓</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<style>
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+@media (max-width: 960px) {
+  .kanban-grid { grid-template-columns: 1fr; }
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kanban-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.kanban-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.kanban-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lead-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-decoration: none !important;
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.lead-card:hover {
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.lead-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lead-username {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lead-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lead-preview {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-body);
+  margin: 0 0 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lead-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-keyword {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pos);
+  background: var(--pos-bg);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.draft-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-bg);
+  padding: 2px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.sent-badge {
+  font-size: 11px;
+  color: var(--pos);
+  font-weight: 700;
+}
+
+.lead-sent {
+  border-color: var(--pos);
+  opacity: 0.85;
+}
+
+#reply-limit {
+  font-size: 13px;
+  font-weight: 500;
+}
+</style>
+{% endblock %}

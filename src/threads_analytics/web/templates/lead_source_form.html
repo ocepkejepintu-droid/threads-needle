@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ 'Edit' if source else 'New' }} Lead Source</h1>
+
+<p class="muted" style="margin-bottom: 18px;">
+  A lead source searches Threads for posts matching your keywords. When a post matches, it becomes a lead you can review and reply to.
+</p>
+
+<form method="post" action="{{ '/lead-sources/' + source.id + '/edit' if source else '/lead-sources/new' }}" class="exp-form card">
+  <label>
+    Name
+    <input 
+      type="text" 
+      name="name" 
+      required 
+      maxlength="80" 
+      placeholder="e.g. Indie Hackers Looking for Analytics"
+      value="{{ source.name if source else '' }}"
+    >
+  </label>
+
+  <label>
+    Keywords
+    <textarea 
+      name="keywords" 
+      rows="5" 
+      required
+      placeholder="looking for analytics&#10;threads growth tool&#10;alternative to native insights"
+    >{{ source.keywords | join('\n') if source else '' }}</textarea>
+    <span class="form-help">
+      Enter one keyword or phrase per line. Posts containing any of these terms will be matched.
+      <br>Be specific — broad terms will match too many posts.
+    </span>
+  </label>
+
+  <label class="checkbox">
+    <input 
+      type="checkbox" 
+      name="is_active" 
+      {{ 'checked' if not source or source.is_active else '' }}
+    >
+    Active (include in searches)
+  </label>
+
+  <div class="action-row">
+    <button type="submit">{{ 'Update' if source else 'Create' }} Source</button>
+    <a href="/lead-sources" class="secondary-link">Cancel</a>
+  </div>
+</form>
+
+<style>
+.exp-form textarea[name="keywords"] {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+</style>
+{% endblock %}

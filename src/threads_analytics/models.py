@@ -445,6 +445,9 @@ class Lead(Base):
     # Matching
     matched_keyword: Mapped[str] = mapped_column(String(256), nullable=False)
 
+    # Engagement
+    reply_count: Mapped[int] = mapped_column(Integer, default=0)
+
     # Workflow status: new, reviewed, approved, sent, rejected
     status: Mapped[str] = mapped_column(String(32), default="new")
 

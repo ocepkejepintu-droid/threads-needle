@@ -28,6 +28,7 @@ from .suggestions import generate_suggestions
 from .threads_client import ThreadsClient
 from .topics import extract_and_persist_topics
 from .you import generate_you_profile
+from .leads_search import run_lead_searches
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +53,15 @@ def run_full_cycle() -> dict:
             # 2. Topics
             topics = extract_and_persist_topics()
             summary["topics"] = [t.label for t in topics]
+
+            # 2b. Lead discovery
+            try:
+                with session_scope() as session:
+                    run = session.get(Run, run_id)
+                    summary["leads"] = run_lead_searches(run, client)
+            except Exception as exc:
+                log.warning("Lead search failed: %s", exc)
+                summary["leads_error"] = repr(exc)
 
             # 3. Affinity (still locked in dev mode; returns quickly)
             with session_scope() as session:

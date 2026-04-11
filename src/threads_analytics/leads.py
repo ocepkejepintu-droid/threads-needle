@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .llm_client import create_llm_client
-from .models import Lead, LeadSearchLog, LeadSource
+from .models import Lead, LeadReply, LeadSearchLog, LeadSource
 
 if TYPE_CHECKING:
     from .threads_client import ThreadsClient
@@ -132,6 +132,7 @@ def send_reply(
     session: Session,
     lead: Lead,
     client: "ThreadsClient",
+    template_id: int | None = None,
 ) -> bool:
     """Send an approved reply via the Threads API.
 
@@ -139,6 +140,7 @@ def send_reply(
         session: Database session
         lead: The lead to send reply for (must be in 'approved' status)
         client: Threads API client
+        template_id: Optional ID of the template used for this reply
 
     Returns:
         True if sent successfully, False otherwise
@@ -189,12 +191,39 @@ def send_reply(
             params={"text": reply_text},
         )
 
+        now = datetime.now(timezone.utc)
+
         # Update lead status
         lead.status = "sent"
-        lead.sent_at = datetime.now(timezone.utc)
+        lead.sent_at = now
         session.commit()
 
-        log.info("Successfully sent reply for lead %s (thread %s)", lead.id, lead.thread_id)
+        # Create LeadReply record for analytics tracking
+        lead_reply = LeadReply(
+            lead_id=lead.id,
+            template_id=template_id,
+            reply_text=reply_text,
+            sent_at=now,
+            has_response=False,
+        )
+        session.add(lead_reply)
+
+        # Update template usage stats if template was used
+        if template_id:
+            from .models import ReplyTemplate
+
+            template = session.query(ReplyTemplate).get(template_id)
+            if template:
+                template.times_used += 1
+
+        session.commit()
+
+        log.info(
+            "Successfully sent reply for lead %s (thread %s), created LeadReply %s",
+            lead.id,
+            lead.thread_id,
+            lead_reply.id,
+        )
         return True
 
     except Exception as exc:

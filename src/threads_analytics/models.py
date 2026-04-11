@@ -524,6 +524,75 @@ class LeadScore(Base):
     )
 
 
+class ReplyTemplate(Base):
+    """Reply templates for lead engagement with A/B testing support."""
+
+    __tablename__ = "reply_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    template_text: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    
+    # A/B testing
+    is_active: Mapped[bool] = mapped_column(default=True)
+    is_winner: Mapped[bool] = mapped_column(default=False)
+    
+    # Stats (denormalized for quick access)
+    times_used: Mapped[int] = mapped_column(Integer, default=0)
+    times_responded: Mapped[int] = mapped_column(Integer, default=0)
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class LeadReply(Base):
+    """Track replies sent to leads and their responses."""
+
+    __tablename__ = "lead_replies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), nullable=False)
+    
+    # Template used (optional - replies can be custom)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reply_templates.id"), nullable=True
+    )
+    
+    # Reply content
+    reply_text: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Sending status
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Response tracking
+    has_response: Mapped[bool] = mapped_column(default=False)
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Conversion tracking
+    converted_to_dm: Mapped[bool] = mapped_column(default=False)
+    dm_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    converted_to_call: Mapped[bool] = mapped_column(default=False)
+    call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    converted_to_client: Mapped[bool] = mapped_column(default=False)
+    client_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    
+    # Relationships
+    lead: Mapped["Lead"] = relationship("Lead")
+    template: Mapped["ReplyTemplate | None"] = relationship("ReplyTemplate")
+
+
 # =============================================================================
 # Growth OS Models
 # =============================================================================

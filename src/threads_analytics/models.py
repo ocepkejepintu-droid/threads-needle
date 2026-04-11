@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -467,88 +468,8 @@ class Lead(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Intent classification
-    intent: Mapped[str] = mapped_column(String(32), default="unclear")
-    intent_confidence: Mapped[float] = mapped_column(Float, default=0.0)
-
     # Relationship
     source: Mapped["LeadSource"] = relationship("LeadSource", back_populates="leads")
-    replies: Mapped[list["LeadReply"]] = relationship("LeadReply", back_populates="lead")
-    score: Mapped["LeadScore | None"] = relationship("LeadScore", back_populates="lead", uselist=False)
-
-
-class LeadReply(Base):
-    """Track all replies sent to leads."""
-
-    __tablename__ = "lead_replies"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"))
-    reply_text: Mapped[str] = mapped_column(Text, nullable=False)
-    reply_type: Mapped[str] = mapped_column(String(32), default="ai_draft")  # "ai_draft", "edited", "manual"
-    template_id: Mapped[int | None] = mapped_column(ForeignKey("reply_templates.id"), nullable=True)
-
-    # Performance metrics
-    has_response: Mapped[bool] = mapped_column(default=False)
-    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Conversion tracking
-    converted_to_dm: Mapped[bool] = mapped_column(default=False)
-    converted_to_call: Mapped[bool] = mapped_column(default=False)
-    converted_to_client: Mapped[bool] = mapped_column(default=False)
-
-    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    metrics_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    lead: Mapped["Lead"] = relationship("Lead", back_populates="replies")
-    template: Mapped["ReplyTemplate | None"] = relationship("ReplyTemplate", back_populates="replies")
-
-
-class ReplyTemplate(Base):
-    """For A/B testing reply templates."""
-
-    __tablename__ = "reply_templates"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(256), nullable=False)
-    category: Mapped[str] = mapped_column(String(32), default="generic")  # "job_seeker", "founder", "service_buyer", "generic"
-    template_text: Mapped[str] = mapped_column(Text, nullable=False)
-
-    times_used: Mapped[int] = mapped_column(Integer, default=0)
-    times_responded: Mapped[int] = mapped_column(Integer, default=0)
-    response_rate: Mapped[float] = mapped_column(Float, default=0.0)
-
-    is_active: Mapped[bool] = mapped_column(default=True)
-    is_winner: Mapped[bool] = mapped_column(default=False)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    replies: Mapped[list["LeadReply"]] = relationship("LeadReply", back_populates="template")
-
-
-class LeadScore(Base):
-    """Computed score for leads."""
-
-    __tablename__ = "lead_scores"
-
-    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), primary_key=True)
-
-    intent_score: Mapped[int] = mapped_column(Integer, default=0)
-    engagement_score: Mapped[int] = mapped_column(Integer, default=0)
-    profile_score: Mapped[int] = mapped_column(Integer, default=0)
-    recency_score: Mapped[int] = mapped_column(Integer, default=0)
-
-    total_score: Mapped[int] = mapped_column(Integer, default=0)
-    quality_tier: Mapped[str] = mapped_column(String(16), default="low")  # "high", "medium", "low"
-
-    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-    # Relationships
-    lead: Mapped["Lead"] = relationship("Lead", back_populates="score")
 
 
 class LeadSearchLog(Base):
@@ -568,60 +489,82 @@ class LeadSearchLog(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-class BrandCheck(Base):
-    """Validation results for content — ensures posts/replies stay on-brand."""
+# =============================================================================
+# Growth OS Models
+# =============================================================================
 
-    __tablename__ = "brand_checks"
+
+class ContentPattern(Base):
+    """Extracted patterns from top-performing posts — hooks, structures, timing, etc."""
+
+    __tablename__ = "content_patterns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    pattern_type: Mapped[str] = mapped_column(
+        String(32)
+    )  # "hook", "structure", "timing", "topic", "format"
+    pattern_name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    example_post_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    example_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    avg_views: Mapped[int] = mapped_column(Integer, default=0)
+    avg_engagement_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    success_rate: Mapped[float] = mapped_column(Float, default=0.0)
+
+    extracted_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class GeneratedIdea(Base):
+    """AI-generated content ideas based on discovered patterns."""
+
+    __tablename__ = "generated_ideas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    content_type: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )  # "scheduled_post", "lead_reply", "experiment_hypothesis"
-    content_text: Mapped[str] = mapped_column(Text, nullable=False)
-    you_profile_id: Mapped[int] = mapped_column(
-        ForeignKey("you_profiles.run_id"), nullable=False
-    )
+    title: Mapped[str] = mapped_column(String(256))
+    concept: Mapped[str] = mapped_column(Text, default="")
 
-    overall_score: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
-    passed: Mapped[bool] = mapped_column(default=False)  # True if score >= 70
+    patterns_used: Mapped[list[int]] = mapped_column(JSON, default=list)  # ContentPattern IDs
 
-    voice_alignment_score: Mapped[int] = mapped_column(Integer, default=0)
-    protect_list_violations: Mapped[list[str] | None] = mapped_column(
-        JSON, nullable=True
-    )  # list of violated protect-list items
-    double_down_score: Mapped[int] = mapped_column(Integer, default=0)
+    predicted_score: Mapped[int] = mapped_column(Integer, default=0)
+    predicted_views_range: Mapped[str] = mapped_column(
+        String(16), default=""
+    )  # "1k-5k", "5k-20k", "20k+"
 
-    suggestions: Mapped[list[dict] | None] = mapped_column(
-        JSON, nullable=True
-    )  # [{"issue": "...", "suggestion": "..."}]
+    status: Mapped[str] = mapped_column(
+        String(32), default="draft"
+    )  # "draft", "approved", "scheduled", "published", "rejected"
 
-    checked_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-
-    violations: Mapped[list["BrandViolation"]] = relationship(
-        back_populates="brand_check", cascade="all, delete-orphan"
-    )
-
-
-class BrandViolation(Base):
-    """Track individual brand violations over time for pattern analysis."""
-
-    __tablename__ = "brand_violations"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    brand_check_id: Mapped[int] = mapped_column(ForeignKey("brand_checks.id"))
-
-    violation_type: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )  # "protect_list", "voice_mismatch", "generic_tone"
-    severity: Mapped[str] = mapped_column(
-        String(16), nullable=False
-    )  # "high", "medium", "low"
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    snippet: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )  # offending text snippet
+    actual_post_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actual_performance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    generated_by: Mapped[str] = mapped_column(
+        String(32), default="ai"
+    )  # "ai", "hybrid", "manual"
 
-    brand_check: Mapped[BrandCheck] = relationship(back_populates="violations")
+
+class PatternPerformance(Base):
+    """Time-series tracking of pattern effectiveness over time."""
+
+    __tablename__ = "pattern_performances"
+    __table_args__ = (
+        UniqueConstraint("pattern_id", "date", name="uq_pattern_date"),
+    )
+
+    pattern_id: Mapped[int] = mapped_column(
+        ForeignKey("content_patterns.id"), primary_key=True
+    )
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+
+    posts_using_pattern: Mapped[int] = mapped_column(Integer, default=0)
+    avg_performance_vs_baseline: Mapped[float] = mapped_column(Float, default=0.0)
+
+    trend: Mapped[str] = mapped_column(
+        String(32), default=""
+    )  # "improving", "stable", "declining"

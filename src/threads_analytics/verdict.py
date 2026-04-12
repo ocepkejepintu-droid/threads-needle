@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 import numpy as np
-from anthropic import Anthropic
 from scipy.stats import mannwhitneyu
 from sqlalchemy import select
 from sqlalchemy.orm import Session

@@ -4,13 +4,13 @@
   <h1>Leads</h1>
   <div style="display: flex; gap: 12px; align-items: center;">
     <span class="muted" id="reply-limit">{{ sent_today }}/{{ daily_limit }} replies today</span>
-    <a class="cta" href="/lead-sources">Manage Sources</a>
+    <a class="cta" href="/leads/sources">Manage Sources</a>
   </div>
 </div>
 
 {% if not active_sources %}
 <div class="banner">
-  No active lead sources. <a href="/lead-sources">Create a source</a> to start finding leads.
+  No active lead sources. <a href="/leads/sources">Create a source</a> to start finding leads.
 </div>
 {% endif %}
 
@@ -25,10 +25,10 @@
       {% for lead in new_leads %}
       <a href="/leads/{{ lead.id }}" class="lead-card">
         <div class="lead-card-header">
-          <span class="lead-username">@{{ lead.username }}</span>
-          <span class="lead-time">{{ lead.created_at | time_ago }}</span>
+          <span class="lead-username">@{{ lead.author_username }}</span>
+          <span class="lead-time">{{ lead.created_at.strftime("%H:%M") if lead.created_at else "" }}</span>
         </div>
-        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <p class="lead-preview">{{ lead.post_text[:150] + "..." if lead.post_text and lead.post_text | length > 150 else lead.post_text }}</p>
         <div class="lead-footer">
           <span class="lead-keyword">{{ lead.matched_keyword }}</span>
         </div>
@@ -47,13 +47,13 @@
       {% for lead in reviewed_leads %}
       <a href="/leads/{{ lead.id }}" class="lead-card">
         <div class="lead-card-header">
-          <span class="lead-username">@{{ lead.username }}</span>
-          <span class="lead-time">{{ lead.reviewed_at | time_ago }}</span>
+          <span class="lead-username">@{{ lead.author_username }}</span>
+          <span class="lead-time">{{ lead.reviewed_at.strftime("%H:%M") if lead.reviewed_at else "" }}</span>
         </div>
-        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <p class="lead-preview">{{ lead.post_text[:150] + "..." if lead.post_text and lead.post_text | length > 150 else lead.post_text }}</p>
         <div class="lead-footer">
           <span class="lead-keyword">{{ lead.matched_keyword }}</span>
-          {% if lead.ai_draft %}
+          {% if lead.ai_draft_reply %}
           <span class="draft-badge">draft</span>
           {% endif %}
         </div>
@@ -72,10 +72,10 @@
       {% for lead in sent_leads %}
       <a href="/leads/{{ lead.id }}" class="lead-card lead-sent">
         <div class="lead-card-header">
-          <span class="lead-username">@{{ lead.username }}</span>
-          <span class="lead-time">{{ lead.sent_at | time_ago }}</span>
+          <span class="lead-username">@{{ lead.author_username }}</span>
+          <span class="lead-time">{{ lead.sent_at.strftime("%H:%M") if lead.sent_at else "" }}</span>
         </div>
-        <p class="lead-preview">{{ lead.post_preview }}</p>
+        <p class="lead-preview">{{ lead.post_text[:150] + "..." if lead.post_text and lead.post_text | length > 150 else lead.post_text }}</p>
         <div class="lead-footer">
           <span class="lead-keyword">{{ lead.matched_keyword }}</span>
           <span class="sent-badge">✓</span>

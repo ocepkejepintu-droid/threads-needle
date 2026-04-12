@@ -2,7 +2,7 @@
 {% block content %}
 <div class="experiments-header">
   <h1>Lead Sources</h1>
-  <a class="cta" href="/lead-sources/new">+ New Source</a>
+  <a class="cta" href="/leads/sources/new">+ New Source</a>
 </div>
 
 <p class="muted" style="margin-bottom: 18px;">
@@ -32,8 +32,8 @@
     </div>
     
     <div class="source-actions">
-      <a href="/lead-sources/{{ source.id }}/edit" class="btn">Edit</a>
-      <form method="post" action="/lead-sources/{{ source.id }}/toggle" style="display: inline;">
+      <a href="/leads/sources/{{ source.id }}/edit" class="btn">Edit</a>
+      <form method="post" action="/leads/sources/{{ source.id }}/toggle" style="display: inline;">
         <button type="submit" class="btn">
           {{ 'Deactivate' if source.is_active else 'Activate' }}
         </button>
@@ -45,7 +45,7 @@
 {% else %}
 <div class="card" style="text-align: center; padding: 40px;">
   <p class="muted" style="margin-bottom: 16px;">No lead sources yet.</p>
-  <a href="/lead-sources/new" class="cta">Create your first source</a>
+  <a href="/leads/sources/new" class="cta">Create your first source</a>
 </div>
 {% endif %}
 

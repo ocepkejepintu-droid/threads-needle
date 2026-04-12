@@ -6,10 +6,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from anthropic import Anthropic
 from sqlalchemy import select
 
 from .config import get_settings
+from .llm_client import create_llm_client
 from .db import session_scope
 from .models import MyPost, PostTopic, Topic
 
@@ -67,20 +67,37 @@ def extract_and_persist_topics(min_new_posts: int = 10) -> list[Topic]:
     if not post_payload:
         return []
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
+    try:
+        client = create_llm_client()
+    except ValueError as e:
+        log.warning("LLM client not configured: %s", e)
+        return list(existing_topics) if existing_count > 0 else []
+    
     user_msg = (
         f"Here are {len(post_payload)} recent posts from a creator. Extract their topics.\n\n"
         f"{SCHEMA_INSTRUCTION}\n\n"
         f"POSTS:\n{json.dumps(post_payload, ensure_ascii=False)}"
     )
 
-    resp = client.messages.create(
-        model=settings.claude_topic_model,
-        max_tokens=2048,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = "".join(block.text for block in resp.content if getattr(block, "text", None))
+    # Select model based on provider
+    if settings.llm_provider == "anthropic":
+        model = settings.claude_topic_model
+    elif settings.llm_provider == "openrouter":
+        model = settings.openrouter_model
+    else:
+        model = settings.zai_model
+    
+    try:
+        resp = client.create_message(
+            model=model,
+            max_tokens=2048,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = resp.text
+    except Exception as e:
+        log.warning("Topic extraction failed: %s", e)
+        return list(existing_topics) if existing_count > 0 else []
     data = _safe_json(text)
     if not data or "topics" not in data:
         log.warning("topic extraction produced no parseable JSON: %s", text[:400])

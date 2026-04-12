@@ -17,11 +17,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from anthropic import Anthropic
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .llm_client import create_llm_client
 from .db import session_scope
 from .models import MyPost, MyPostInsight, NoteworthyPost, Run
 
@@ -547,14 +547,31 @@ def generate_noteworthy_commentary(run: Run) -> list[int]:
         f"NOTEWORTHY POSTS TO ANALYZE:\n{json.dumps(cand_payload, ensure_ascii=False, indent=2)}"
     )
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
-    resp = client.messages.create(
-        model=settings.claude_recommender_model,
-        max_tokens=4000,
-        system=system,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = "".join(block.text for block in resp.content if getattr(block, "text", None))
+    try:
+        client = create_llm_client()
+    except ValueError as e:
+        log.warning("LLM client not configured: %s", e)
+        return []
+    
+    # Select model based on provider
+    if settings.llm_provider == "anthropic":
+        model = settings.claude_recommender_model
+    elif settings.llm_provider == "openrouter":
+        model = settings.openrouter_model
+    else:
+        model = settings.zai_model
+    
+    try:
+        resp = client.create_message(
+            model=model,
+            max_tokens=4000,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = resp.text
+    except Exception as e:
+        log.warning("Noteworthy commentary failed: %s", e)
+        return []
     data = _safe_json(text)
     if not data or "analyses" not in data:
         log.warning("noteworthy commentary produced no parseable JSON: %s", text[:400])

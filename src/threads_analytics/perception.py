@@ -21,10 +21,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from anthropic import Anthropic
 from sqlalchemy import desc, select
 
 from .config import get_settings
+from .llm_client import create_llm_client
 from .db import session_scope
 from .models import MyPost, MyReply, Profile, PublicPerception, Run
 
@@ -144,24 +144,41 @@ def generate_public_perception(run: Run) -> int | None:
     for url in image_urls:
         content.append({"type": "image", "source": {"type": "url", "url": url}})
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
     try:
-        resp = client.messages.create(
-            model=settings.claude_recommender_model,
+        client = create_llm_client()
+    except ValueError as e:
+        log.warning("LLM client not configured: %s", e)
+        return None
+    
+    # Select model based on provider
+    if settings.llm_provider == "anthropic":
+        model = settings.claude_recommender_model
+    elif settings.llm_provider == "openrouter":
+        model = settings.openrouter_model
+    else:
+        model = settings.zai_model
+    
+    try:
+        resp = client.create_message(
+            model=model,
             max_tokens=2500,
             system=SYSTEM,
             messages=[{"role": "user", "content": content}],
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("perception vision call failed, retrying text-only: %s", exc)
-        resp = client.messages.create(
-            model=settings.claude_recommender_model,
-            max_tokens=2500,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": text_body}],
-        )
+        try:
+            resp = client.create_message(
+                model=model,
+                max_tokens=2500,
+                system=SYSTEM,
+                messages=[{"role": "user", "content": text_body}],
+            )
+        except Exception as e:
+            log.warning("Perception generation failed: %s", e)
+            return None
 
-    text = "".join(block.text for block in resp.content if getattr(block, "text", None))
+    text = resp.text
     data = _safe_json(text)
     if not data:
         log.warning("perception produced no parseable JSON: %s", text[:400])

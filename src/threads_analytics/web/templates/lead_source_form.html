@@ -6,7 +6,7 @@
   A lead source searches Threads for posts matching your keywords. When a post matches, it becomes a lead you can review and reply to.
 </p>
 
-<form method="post" action="{{ '/lead-sources/' + source.id + '/edit' if source else '/lead-sources/new' }}" class="exp-form card">
+<form method="post" action="{{ '/leads/sources/' + source.id + '/edit' if source else '/leads/sources/new' }}" class="exp-form card">
   <label>
     Name
     <input 
@@ -44,7 +44,7 @@
 
   <div class="action-row">
     <button type="submit">{{ 'Update' if source else 'Create' }} Source</button>
-    <a href="/lead-sources" class="secondary-link">Cancel</a>
+    <a href="/leads/sources" class="secondary-link">Cancel</a>
   </div>
 </form>
 

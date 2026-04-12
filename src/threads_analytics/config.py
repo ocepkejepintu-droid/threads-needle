@@ -46,10 +46,21 @@ class Settings(BaseSettings):
     threads_user_id: str = ""
     threads_handle: str = ""
 
+    # LLM Provider (anthropic or zai)
+    llm_provider: str = "anthropic"
+
     # Anthropic
     anthropic_api_key: str = ""
     claude_recommender_model: str = "claude-opus-4-6"
     claude_topic_model: str = "claude-sonnet-4-6"
+
+    # Z.ai GLM
+    zai_api_key: str = ""
+    zai_model: str = "glm-4"
+
+    # OpenRouter
+    openrouter_api_key: str = ""
+    openrouter_model: str = "anthropic/claude-sonnet-4.6"
 
     # Storage
     database_url: str = "sqlite:///data/threads.db"

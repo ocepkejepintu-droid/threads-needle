@@ -25,6 +25,7 @@ from ..leads import generate_reply_draft, send_reply
 from ..leads_search import run_lead_searches
 from ..models import LeadReply, ReplyTemplate
 from ..brand_validator import validate_content
+from ..brand_reporter import generate_weekly_report
 from ..metrics import METRIC_META, METRIC_ORDER, compute_ground_truth
 from ..models import (
     AffinityCreator,
@@ -881,8 +882,8 @@ def build_router(templates: Jinja2Templates) -> APIRouter:
         """Create source form."""
         return templates.TemplateResponse(
             request,
-            "lead_source_new.html",
-            {},
+            "lead_source_form.html",
+            {"source": None},
         )
 
     @router.post("/leads/sources")

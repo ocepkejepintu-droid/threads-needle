@@ -16,10 +16,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from anthropic import Anthropic
 from sqlalchemy import desc, select
 
 from .config import get_settings
+from .llm_client import create_llm_client
 from .db import session_scope
 from .models import MyPost, MyReply, Profile, Run, YouProfile
 
@@ -113,14 +113,31 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
         )
     )
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
-    resp = client.messages.create(
-        model=settings.claude_recommender_model,
-        max_tokens=3500,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": text_body}],
-    )
-    text = "".join(block.text for block in resp.content if getattr(block, "text", None))
+    try:
+        client = create_llm_client()
+    except ValueError as e:
+        log.warning("LLM client not configured: %s", e)
+        return None
+    
+    # Select model based on provider
+    if settings.llm_provider == "anthropic":
+        model = settings.claude_recommender_model
+    elif settings.llm_provider == "openrouter":
+        model = settings.openrouter_model
+    else:
+        model = settings.zai_model
+    
+    try:
+        resp = client.create_message(
+            model=model,
+            max_tokens=3500,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": text_body}],
+        )
+        text = resp.text
+    except Exception as e:
+        log.warning("You profile generation failed: %s", e)
+        return None
     data = _safe_json(text)
     if not data:
         log.warning("you profile produced no parseable JSON: %s", text[:400])

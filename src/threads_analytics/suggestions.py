@@ -14,11 +14,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from anthropic import Anthropic
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .llm_client import create_llm_client
 from .experiments import create_experiment, personal_category_performance
 from .metrics import (
     METRIC_META,
@@ -178,14 +178,31 @@ def generate_suggestions(session: Session, n: int = 6) -> list[int]:
         f"DATA:\n{json.dumps(data, default=str, ensure_ascii=False, indent=2)}"
     )
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
-    resp = client.messages.create(
-        model=settings.claude_recommender_model,
-        max_tokens=4096,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = "".join(block.text for block in resp.content if getattr(block, "text", None))
+    try:
+        client = create_llm_client()
+    except ValueError as e:
+        log.warning("LLM client not configured: %s", e)
+        return []
+    
+    # Select model based on provider
+    if settings.llm_provider == "anthropic":
+        model = settings.claude_recommender_model
+    elif settings.llm_provider == "openrouter":
+        model = settings.openrouter_model
+    else:
+        model = settings.zai_model
+    
+    try:
+        resp = client.create_message(
+            model=model,
+            max_tokens=4096,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = resp.text
+    except Exception as e:
+        log.warning("Suggestion generation failed: %s", e)
+        return []
     parsed = _safe_json(text)
     if not parsed or "experiments" not in parsed:
         log.warning("suggestions produced no parseable JSON: %s", text[:400])

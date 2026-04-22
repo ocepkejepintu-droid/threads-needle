@@ -363,6 +363,30 @@ def register_content_routes(router, templates: Jinja2Templates):
             session.flush()
             idea_id = idea.id
 
+            # Auto-publish if requested
+            if data.get("auto_publish"):
+                from ..publish_gate import gate_publish_idea
+                from ..publisher import publish_scheduled_idea
+
+                idea.status = "approved"
+                session.flush()
+
+                gate = gate_publish_idea(idea_id)
+                if not gate.allowed:
+                    return JSONResponse({
+                        "success": True,
+                        "idea_id": idea_id,
+                        "published": False,
+                        "publish_error": gate.reason,
+                    })
+
+                published = publish_scheduled_idea(idea_id)
+                return JSONResponse({
+                    "success": True,
+                    "idea_id": idea_id,
+                    "published": published,
+                })
+
         return JSONResponse({"success": True, "idea_id": idea_id})
 
     # ── Hermes bridge ──────────────────────────────────────────────────────

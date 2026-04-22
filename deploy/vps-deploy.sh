@@ -17,15 +17,10 @@ if command -v apt-get &> /dev/null; then
 elif command -v yum &> /dev/null; then
     # RHEL/CentOS/OpenCloudOS
     yum install -y python3 python3-pip git
-    # Install Caddy
+    # Install Caddy via official binary
     if ! command -v caddy &> /dev/null; then
-        yum install -y yum-utils
-        yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/g/caddy/caddy/repo/epel-8/group_caddy-caddy-epel-8.repo
-        yum install -y caddy || {
-            # Fallback: install Caddy via official binary
-            curl -1sLf 'https://caddyserver.com/api/download?os=linux&arch=amd64' -o /usr/local/bin/caddy
-            chmod +x /usr/local/bin/caddy
-        }
+        curl -1sLf 'https://caddyserver.com/api/download?os=linux&arch=amd64' -o /usr/local/bin/caddy
+        chmod +x /usr/local/bin/caddy
     fi
 elif command -v dnf &> /dev/null; then
     # Fedora/RHEL 8+

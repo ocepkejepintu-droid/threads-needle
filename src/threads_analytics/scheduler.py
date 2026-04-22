@@ -214,19 +214,11 @@ def _publisher_loop() -> None:
     while not stop_event.is_set():
         try:
             # Daily intake fetch at ~08:00 WIB (01:00 UTC)
+            # DISABLED: Hermes is now the sole content source.
+            # Old intake fetchers (HN, RSS) are skipped.
             now = datetime.now(timezone.utc)
             today_str = now.strftime("%Y-%m-%d")
-            if (
-                _state.last_intake_date != today_str
-                and now.hour >= _INTAKE_HOUR_UTC
-                and now.minute >= _INTAKE_MINUTE_UTC
-            ):
-                try:
-                    expire_old_items()
-                    result = run_intake_cycle()
-                    log.info("Daily intake complete: %s", result)
-                except Exception as exc:
-                    log.error("Daily intake cycle failed: %s", exc)
+            if _state.last_intake_date != today_str:
                 _state.last_intake_date = today_str
 
             # Hourly outcome tagging for posts published ~24h ago

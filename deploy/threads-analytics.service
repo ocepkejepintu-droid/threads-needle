@@ -1,0 +1,17 @@
+[Unit]
+Description=Threads Analytics Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/threads-analytics
+Environment="PATH=/opt/threads-analytics/.venv/bin"
+EnvironmentFile=/opt/threads-analytics/.env
+ExecStart=/opt/threads-analytics/.venv/bin/uvicorn threads_analytics.web.app:create_app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

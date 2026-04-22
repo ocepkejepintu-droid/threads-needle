@@ -1,0 +1,111 @@
+{
+  "active_plan": "/Users/yoseph/threads-needle/.sisyphus/plans/comment-replies-mission-control.md",
+  "started_at": "2026-04-16T17:05:00.000Z",
+  "session_ids": [
+    "ses_26aa19ae5ffehzTqcJC3a3Csq3",
+    "ses_2688629c3ffeNnr6Hf4uE9QuVX",
+    "ses_268860440ffecsMQQDSSERCI2o",
+    "ses_26885e253ffeeAHa0XYYZe5Aq9",
+    "ses_26885beeaffeqGpXPaRfm6a2S4",
+    "ses_268342559ffeM61GyRRt7xmHD9",
+    "ses_2683409daffeQKZ6IWpdSpnpml",
+    "ses_26833efbcffetviD8fJQ2C8P7Q",
+    "ses_26833cf0effey0kfsR162qS314"
+  ],
+  "session_origins": {
+    "ses_26aa19ae5ffehzTqcJC3a3Csq3": "direct",
+    "ses_2688629c3ffeNnr6Hf4uE9QuVX": "appended",
+    "ses_268860440ffecsMQQDSSERCI2o": "appended",
+    "ses_26885e253ffeeAHa0XYYZe5Aq9": "appended",
+    "ses_26885beeaffeqGpXPaRfm6a2S4": "appended",
+    "ses_268342559ffeM61GyRRt7xmHD9": "appended",
+    "ses_2683409daffeQKZ6IWpdSpnpml": "appended",
+    "ses_26833efbcffetviD8fJQ2C8P7Q": "appended",
+    "ses_26833cf0effey0kfsR162qS314": "appended"
+  },
+  "plan_name": "comment-replies-mission-control",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Define dedicated comment inbox schema and workflow state machine",
+      "session_id": "ses_268bd0f1dffetLw6BDxTHCjn5B",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-16T17:11:39.783Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Build idempotent polling ingestion for recent owned posts",
+      "session_id": "ses_268b6d736ffeTTxUOnmOl8WKUZ",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-16T17:18:22.502Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Add comment-specific LLM drafting in the user’s voice",
+      "session_id": "ses_268b1951effeJYURSthR1Fhmpc",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-16T17:25:02.258Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Implement explicit approve/edit/send workflow with reply gate reuse",
+      "session_id": "ses_268ab3220ffeFffgre364Xn1kQ",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-16T17:31:59.560Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Integrate Mission Control sync into existing run-comments orchestration",
+      "session_id": "ses_268a2f170ffeIk31rH9k5at5x0",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-16T17:40:00.136Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Add account-scoped Mission Control routes and bulk action endpoints",
+      "session_id": "ses_2689ce7e5ffetMhUBldEb76ioG",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-16T17:49:28.641Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Build the Mission Control page, selection UX, and sidebar entry",
+      "session_id": "ses_26894b51effe3NAIAd68Db8Mmd",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-04-16T17:58:36.770Z"
+    },
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "Add route/UI regression coverage for Mission Control workflows",
+      "session_id": "ses_2688d0cd7ffehEmyEXkCvUMbPl",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-04-16T18:06:26.751Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_26833cf0effey0kfsR162qS314",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-16T20:07:49.553Z"
+    }
+  }
+}

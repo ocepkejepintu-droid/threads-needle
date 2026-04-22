@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="content-pipeline-wrapper">
+  <div class="page-header">
+    <h1>Comments Mission Control</h1>
+    <div class="actions">
+      <button class="btn btn-secondary" id="sync-btn" onclick="triggerRunComments()">Sync comments</button>
+    </div>
+  </div>
+
+<style>
+/* Full-width override — same as content_pipeline */
+.main-col .main-inner {
+  max-width: none !important;
+  width: 100%;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+}
+.content-pipeline-wrapper { width: 100%; max-width: 100%; }
+.page-header { padding: 0 0.25rem; margin-bottom: 0.75rem; }
+.page-header h1 { font-size: 1.25rem; }
+.page-header .actions { display: flex; gap: 0.5rem; }
+
+/* Summary chips */
+.cm-summary-row {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  margin-bottom: 0.75rem; padding: 0 0.25rem;
+}
+.cm-summary-chip {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.375rem 0.75rem; border-radius: 9999px;
+  font-size: 0.8125rem; font-weight: 600;
+  background: var(--surface-sunken); color: var(--text);
+  border: 1px solid var(--border);
+}
+.cm-summary-chip .cm-count { font-variant-numeric: tabular-nums; }
+.cm-chip-drafted   { border-color: var(--border-strong); }
+.cm-chip-approved  { border-color: rgba(0,149,246,0.35); background: rgba(0,149,246,0.08); color: var(--link); }
+.cm-chip-sent      { border-color: rgba(34,197,94,0.35);  background: var(--pos-bg); color: var(--pos); }
+.cm-chip-send_failed { border-color: rgba(224,36,94,0.35); background: var(--neg-bg); color: var(--neg); }
+.cm-chip-ignored   { border-color: var(--border); color: var(--text-muted); }
+
+/* Board layout */
+.comments-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem; padding: 0.5rem 0;
+}
+@media (max-width: 1400px) { .comments-board { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px)  { .comments-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .comments-board { grid-template-columns: minmax(0, 1fr); } }
+
+.comments-column {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 200px); min-width: 0;
+}
+.comments-column-header {
+  padding: 0.75rem; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.comments-column-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.comments-column-count {
+  background: var(--surface-sunken); padding: 0.125rem 0.375rem;
+  border-radius: 9999px; font-size: 0.6875rem; color: var(--text-muted);
+}
+.comments-column-cards {
+  flex: 1; overflow-y: auto; padding: 0.5rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+/* Comment card */
+.comment-card {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.75rem;
+  transition: border-color 0.15s ease;
+}
+.comment-card:hover { border-color: var(--link); }
+.comment-card.cm-selected { border-color: var(--link); background: rgba(0,149,246,0.06); }
+
+.comment-card-top {
+  display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.375rem;
+}
+.comment-card-checkbox {
+  margin-top: 2px; accent-color: var(--link); flex-shrink: 0; cursor: pointer;
+}
+.comment-card-body { flex: 1; min-width: 0; }
+
+.comment-card-author {
+  font-size: 0.75rem; font-weight: 600; color: var(--text);
+  margin-bottom: 0.25rem;
+}
+.comment-card-text {
+  font-size: 0.8125rem; color: var(--text-body); line-height: 1.4;
+  margin-bottom: 0.375rem;
+  display: -webkit-box; -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.comment-card-source {
+  font-size: 0.6875rem; color: var(--text-muted); line-height: 1.4;
+  margin-bottom: 0.5rem;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+  border-top: 1px solid var(--divider); padding-top: 0.375rem;
+}
+
+.comment-card-draft {
+  font-size: 0.8125rem; color: var(--text-body); line-height: 1.45;
+  white-space: pre-wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  max-height: 100px; overflow: hidden;
+}
+
+.comment-card-status {
+  display: inline-flex; align-items: center;
+  font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em;
+  padding: 0.125rem 0.375rem; border-radius: 9999px;
+  text-transform: uppercase;
+}
+.cm-status-drafted    { background: var(--surface-sunken); color: var(--text-muted); }
+.cm-status-approved   { background: rgba(0,149,246,0.15); color: var(--link); }
+.cm-status-sending    { background: rgba(0,149,246,0.10); color: var(--link); }
+.cm-status-sent       { background: var(--pos-bg); color: var(--pos); }
+.cm-status-send_failed { background: var(--neg-bg); color: var(--neg); }
+.cm-status-ignored    { background: var(--surface-sunken); color: var(--text-faint); }
+
+.comment-card-error {
+  font-size: 0.6875rem; color: var(--neg); line-height: 1.4;
+  margin-top: 0.25rem;
+}
+
+.comment-card-actions {
+  display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.375rem;
+}
+
+/* Reuse action-btn from content_pipeline */
+.cm-action-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0.125rem 0.375rem;
+  font-size: 0.6875rem; color: var(--text-muted); cursor: pointer;
+  transition: all 0.15s;
+}
+.cm-action-btn:hover { background: var(--link); border-color: var(--link); color: white; }
+.cm-action-btn.danger:hover { background: var(--neg); border-color: var(--neg); }
+
+/* Bulk action bar */
+.cm-bulk-bar {
+  position: fixed; bottom: 0; left: var(--sidebar-w); right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 0.75rem 1.5rem; display: none; align-items: center; gap: 0.75rem;
+  z-index: 40; box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  font-size: 0.875rem;
+}
+.cm-bulk-bar.visible { display: flex; }
+.cm-bulk-count { font-weight: 600; color: var(--text); }
+.cm-bulk-bar button {
+  background: var(--surface-sunken); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem; font-weight: 600; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: var(--font);
+}
+.cm-bulk-bar button:hover { background: var(--text); color: var(--surface); }
+.cm-bulk-bar button.cm-bulk-send { background: var(--pos); color: white; border-color: var(--pos); }
+.cm-bulk-bar button.cm-bulk-send:hover { opacity: 0.9; }
+.cm-bulk-bar button.cm-bulk-danger:hover { background: var(--neg); border-color: var(--neg); color: white; }
+
+/* Edit modal — reuse modal patterns from content_pipeline */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+  display: none; justify-content: center; align-items: center; z-index: 100;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 500px;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem;
+}
+.modal-title { font-size: 1.125rem; font-weight: 600; }
+.modal-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 1.5rem; cursor: pointer;
+}
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+  display: block; font-size: 0.8125rem; font-weight: 500;
+  margin-bottom: 0.375rem; color: var(--text-muted);
+}
+.form-group textarea {
+  width: 100%; padding: 0.625rem;
+  background: var(--surface-sunken); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 0.875rem;
+  min-height: 120px; resize: vertical; font-family: var(--font);
+}
+.form-group textarea:focus { outline: none; border-color: var(--link); }
+.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+/* Toast — reuse from content_pipeline */
+.toast-container {
+  position: fixed; bottom: 1rem; right: 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem; z-index: 100;
+}
+.toast {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  animation: slideIn 0.3s ease;
+}
+.toast.success { border-color: var(--pos); color: var(--pos); }
+.toast.error   { border-color: var(--neg); color: var(--neg); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.cm-empty { text-align: center; color: var(--text-faint); font-size: 0.8125rem; padding: 1.5rem 0; }
+
+.cm-controls {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-bottom: 0.75rem; padding: 0 0.25rem; flex-wrap: wrap;
+}
+.cm-search {
+  flex: 1; min-width: 200px; max-width: 320px;
+  padding: 0.5rem 0.75rem; font-size: 0.875rem;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.cm-search:focus { outline: none; border-color: var(--link); }
+.cm-filters { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.cm-filter {
+  padding: 0.375rem 0.75rem; font-size: 0.75rem; font-weight: 600;
+  background: var(--surface-sunken); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 9999px; cursor: pointer;
+  transition: all 0.15s; font-family: var(--font);
+}
+.cm-filter:hover { background: var(--border); color: var(--text); }
+.cm-filter.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+.comments-column.hidden { display: none; }
+.comment-card.hidden { display: none; }
+</style>
+
+{# ── Summary chips ── #}
+<div class="cm-summary-row">
+  <span class="cm-summary-chip cm-chip-drafted">Drafted <span class="cm-count">{{ counts.drafted }}</span></span>
+  <span class="cm-summary-chip cm-chip-approved">Approved <span class="cm-count">{{ counts.approved }}</span></span>
+  <span class="cm-summary-chip cm-chip-sent">Sent <span class="cm-count">{{ counts.sent }}</span></span>
+  <span class="cm-summary-chip cm-chip-send_failed">Failed <span class="cm-count">{{ counts.send_failed }}</span></span>
+  <span class="cm-summary-chip cm-chip-ignored">Ignored <span class="cm-count">{{ counts.ignored }}</span></span>
+  {% if not archived %}
+  <a href="?archived=1" class="cm-summary-chip" style="text-decoration:none; margin-left:auto;">🗂️ Show archived</a>
+  {% else %}
+  <a href="?archived=0" class="cm-summary-chip" style="text-decoration:none; margin-left:auto;">🔲 Hide archived</a>
+  {% endif %}
+</div>
+
+{# ── Search / Filter ── #}
+<div class="cm-controls">
+  <input type="text" id="cm-search" class="cm-search" placeholder="Search comments or authors...">
+  <div class="cm-filters" id="cm-filters">
+    <button class="cm-filter active" data-filter="needs_reply">Needs reply</button>
+    <button class="cm-filter" data-filter="drafted">Drafted</button>
+    <button class="cm-filter" data-filter="approved">Approved</button>
+    <button class="cm-filter" data-filter="send_failed">Failed</button>
+    <button class="cm-filter" data-filter="ignored">Ignored</button>
+    <button class="cm-filter" data-filter="all">All</button>
+    {% if archived %}
+    <button class="cm-filter" data-filter="sent">Sent</button>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Board columns ── #}
+<div class="comments-board">
+
+  {% set selectable_statuses = ['drafted', 'approved', 'send_failed'] %}
+
+  {% for col_status, col_label, col_emoji in [
+    ('drafted', 'Drafted', '📝'),
+    ('approved', 'Approved', '✅'),
+    ('sent', 'Sent', '📤'),
+    ('send_failed', 'Failed', '❌'),
+    ('ignored', 'Ignored', '🔕'),
+  ] %}
+  <div class="comments-column">
+    <div class="comments-column-header">
+      <span class="comments-column-title">{{ col_emoji }} {{ col_label }}</span>
+      <span class="comments-column-count">{{ counts[col_status] }}</span>
+    </div>
+    <div class="comments-column-cards">
+      {% for item in inbox_items if item.status == col_status %}
+      <div class="comment-card" data-id="{{ item.id }}" data-status="{{ item.status }}">
+        <div class="comment-card-top">
+          {% if col_status in selectable_statuses %}
+          <input type="checkbox" class="comment-card-checkbox" data-id="{{ item.id }}" data-status="{{ item.status }}" aria-label="Select item {{ item.id }}">
+          {% endif %}
+          <div class="comment-card-body">
+            <div class="comment-card-author">@{{ item.comment_author_username or 'unknown' }}</div>
+            <div class="comment-card-text">{{ item.comment_text }}</div>
+            <div class="comment-card-source">{{ item.source_post_text }}</div>
+          </div>
+        </div>
+
+        {% set draft_text = item.final_reply or item.ai_draft_reply or '' %}
+        {% if draft_text %}
+        <div class="comment-card-draft" id="draft-{{ item.id }}">{{ draft_text }}</div>
+        {% endif %}
+
+        <div style="display:flex; align-items:center; gap:0.375rem;">
+          <span class="comment-card-status cm-status-{{ item.status }}">{{ item.status }}</span>
+          {% if item.status == 'sent' and item.sent_at %}
+          <span style="font-size:0.625rem; color:var(--text-muted);">✓ {{ item.sent_at.strftime('%b %d %H:%M') }}</span>
+          {% endif %}
+        </div>
+
+        {% if item.send_error %}
+        <div class="comment-card-error">{{ item.send_error }}</div>
+        {% endif %}
+
+        <div class="comment-card-actions">
+          {% if draft_text and col_status != 'sent' %}
+          <button class="cm-action-btn" onclick="openEditModal({{ item.id }})">Edit draft</button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if counts[col_status] == 0 %}
+      <div class="cm-empty">No items</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+</div>
+
+{# ── Bulk action bar ── #}
+<div class="cm-bulk-bar" id="bulkBar">
+  <span class="cm-bulk-count" id="bulkCount">0 selected</span>
+  <button onclick="bulkAction('approve')">Approve</button>
+  <button onclick="bulkAction('unapprove')">Unapprove</button>
+  <button onclick="bulkAction('ignore')">Ignore</button>
+  <button class="cm-bulk-send" onclick="bulkAction('send')">Send selected</button>
+  <button onclick="bulkAction('regenerate')">Regenerate drafts</button>
+</div>
+
+{# ── Edit draft modal ── #}
+<div class="modal-overlay" id="editDraftModal" onclick="closeEditModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit reply draft</h3>
+      <button class="modal-close" onclick="closeEditModal()">&times;</button>
+    </div>
+    <div class="form-group">
+      <label>Reply text</label>
+      <textarea id="editDraftText"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDraft()">Save</button>
+    </div>
+  </div>
+</div>
+
+{# ── Toast container ── #}
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(function() {
+  const PREFIX = {{ account_path_prefix|tojson }};
+
+  // ── Selection tracking ──
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.comment-card-checkbox:checked'))
+      .map(cb => parseInt(cb.dataset.id));
+  }
+
+  function updateBulkBar() {
+    const ids = getSelectedIds();
+    const bar = document.getElementById('bulkBar');
+    const count = document.getElementById('bulkCount');
+    count.textContent = ids.length + ' selected';
+    bar.classList.toggle('visible', ids.length > 0);
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('comment-card-checkbox')) {
+      const card = e.target.closest('.comment-card');
+      card.classList.toggle('cm-selected', e.target.checked);
+      updateBulkBar();
+    }
+  });
+
+  // ── Bulk actions ──
+  window.bulkAction = async function(action) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) { showToast('Select items first', 'error'); return; }
+    try {
+      const resp = await fetch(PREFIX + '/comments/api/' + action, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids}),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        showToast(action + ' done', 'success');
+        location.reload();
+      } else {
+        showToast(data.error || 'Failed', 'error');
+      }
+    } catch(e) {
+      showToast('Network error', 'error');
+    }
+  };
+
+  // ── Edit draft modal ──
+  let currentEditId = null;
+
+  window.openEditModal = function(id) {
+    currentEditId = id;
+    const el = document.getElementById('draft-' + id);
+    document.getElementById('editDraftText').value = el ? el.textContent : '';
+    document.getElementById('editDraftModal').classList.add('active');
+  };
+
+  window.closeEditModal = function(e) {
+    if (!e || e.target.id === 'editDraftModal') {
+      document.getElementById('editDraftModal').classList.remove('active');
+      currentEditId = null;
+    }
+  };
+
+  window.saveDraft = async function() {
+    if (!currentEditId) return;
+    const text = document.getElementById('editDraftText').value;
+    try {
+      const resp = await fetch(PREFIX + '/comments/api/edit', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: currentEditId, text: text}),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        showToast('Draft saved', 'success');
+        location.reload();
+      } else {
+        showToast(data.error || 'Failed', 'error');
+      }
+    } catch(e) {
+      showToast('Network error', 'error');
+    }
+    closeEditModal();
+  };
+
+  // ── Toast ──
+  function showToast(msg, type) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+  window.showToast = showToast;
+
+  // ── Search / Filter ──
+  const searchInput = document.getElementById('cm-search');
+  const filterButtons = document.querySelectorAll('.cm-filter');
+
+  function applyFilters() {
+    const q = (searchInput.value || '').toLowerCase().trim();
+    const activeFilter = document.querySelector('.cm-filter.active')?.dataset.filter || 'needs_reply';
+    const needsReplyStatuses = new Set(['drafted', 'approved', 'send_failed']);
+
+    document.querySelectorAll('.comments-column').forEach(col => {
+      const title = col.querySelector('.comments-column-title').textContent;
+      let columnStatus = '';
+      if (title.includes('Drafted')) columnStatus = 'drafted';
+      else if (title.includes('Approved')) columnStatus = 'approved';
+      else if (title.includes('Sent')) columnStatus = 'sent';
+      else if (title.includes('Failed')) columnStatus = 'send_failed';
+      else if (title.includes('Ignored')) columnStatus = 'ignored';
+
+      let showColumn = false;
+      if (activeFilter === 'all') {
+        showColumn = true;
+      } else if (activeFilter === 'needs_reply') {
+        showColumn = needsReplyStatuses.has(columnStatus);
+      } else {
+        showColumn = activeFilter === columnStatus;
+      }
+      col.classList.toggle('hidden', !showColumn);
+
+      col.querySelectorAll('.comment-card').forEach(card => {
+        const text = (card.querySelector('.comment-card-text')?.textContent || '').toLowerCase();
+        const author = (card.querySelector('.comment-card-author')?.textContent || '').toLowerCase();
+        const source = (card.querySelector('.comment-card-source')?.textContent || '').toLowerCase();
+        const matchesSearch = !q || text.includes(q) || author.includes(q) || source.includes(q);
+        card.classList.toggle('hidden', !matchesSearch);
+      });
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', applyFilters);
+  }
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // ── Keyboard ──
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeEditModal();
+  });
+})();
+</script>
+
+{% endblock %}

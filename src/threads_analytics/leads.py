@@ -9,9 +9,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .config import get_settings
-from .llm_client import create_llm_client
-from .models import Lead, LeadReply, LeadSearchLog, LeadSource
+from .llm_client import get_llm_client
+from .models import Account, Lead, LeadReply, LeadSource, PublishLedger
 
 if TYPE_CHECKING:
     from .threads_client import ThreadsClient
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 # Constants
-MAX_DAILY_REPLIES = 10
+MAX_DAILY_REPLIES = 25
 RECONTACT_COOLDOWN_DAYS = 30
 
 SYSTEM_PROMPT = """You are a helpful expert in AI engineering and developer tools.
@@ -44,6 +43,68 @@ REPLY STRUCTURE:
 Write only the reply text, nothing else."""
 
 
+def draft_replies_for_leads(
+    session: Session,
+    min_tier: str = "medium",
+    max_per_run: int = 20,
+    account_id: int | None = None,
+) -> int:
+    """Auto-generate reply drafts for high-quality leads.
+
+    Only drafts replies for leads that don't already have an ai_draft_reply.
+    Respects max_per_run to control API costs.
+
+    Args:
+        session: Database session
+        min_tier: Minimum quality tier to draft for ('high', 'medium', 'low')
+        max_per_run: Maximum number of drafts to generate in one run
+        account_id: Optional account ID to scope leads to
+
+    Returns:
+        Number of reply drafts generated
+    """
+    tier_order = {"high": 3, "medium": 2, "low": 1}
+    min_rank = tier_order.get(min_tier, 2)
+
+    # Find leads without drafts that meet the tier threshold
+    query = (
+        session.query(Lead)
+        .outerjoin(Lead.score)
+        .filter(Lead.ai_draft_reply.is_(None))
+        .filter(Lead.status.in_(["new", "reviewed"]))
+    )
+    if account_id is not None:
+        query = query.filter(Lead.account_id == account_id)
+    pending = query.all()
+
+    eligible = []
+    for lead in pending:
+        if lead.score and tier_order.get(lead.score.quality_tier, 0) >= min_rank:
+            eligible.append(lead)
+
+    eligible.sort(key=lambda lead: lead.score.total_score if lead.score else 0, reverse=True)
+    to_draft = eligible[:max_per_run]
+
+    count = 0
+    for lead in to_draft:
+        try:
+            draft = generate_reply_draft(
+                post_text=lead.post_text,
+                author_bio=lead.author_bio,
+                matched_keyword=lead.matched_keyword,
+            )
+            lead.ai_draft_reply = draft
+            lead.ai_draft_generated_at = datetime.now(timezone.utc)
+            count += 1
+            log.info("Generated reply draft for lead %s", lead.id)
+        except Exception as exc:
+            log.error("Failed to draft reply for lead %s: %s", lead.id, exc)
+            continue
+
+    log.info("Generated %d reply drafts out of %d eligible leads", count, len(to_draft))
+    return count
+
+
 def should_skip_post(
     post_text: str,
     author_user_id: str,
@@ -60,7 +121,7 @@ def should_skip_post(
         return True, "own_post"
 
     # Skip posts with too many replies (likely viral, low conversion)
-    if reply_count > 50:
+    if reply_count > 10:
         return True, "too_many_replies"
 
     # Skip very short posts (likely low quality)
@@ -91,7 +152,7 @@ def generate_reply_draft(
     Returns:
         The generated reply text (should be under 280 chars)
     """
-    client = create_llm_client()
+    client = get_llm_client()
 
     bio_context = f"\nAuthor bio: {author_bio}" if author_bio else ""
 
@@ -124,14 +185,11 @@ Write a helpful, authentic reply (under 280 characters)."""
         # Return a simple fallback reply
         return f"Great question about {matched_keyword}! I'd love to hear more about what you're working on."
 
-    finally:
-        client.close()
-
 
 def send_reply(
     session: Session,
     lead: Lead,
-    client: "ThreadsClient",
+    client: "ThreadsClient | None" = None,
     template_id: int | None = None,
 ) -> bool:
     """Send an approved reply via the Threads API.
@@ -150,20 +208,21 @@ def send_reply(
         log.warning("Lead %s is not approved (status=%s), skipping", lead.id, lead.status)
         return False
 
-    # Check daily reply limit
+    # Check daily reply limit (account-scoped)
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     replies_sent_today = (
         session.query(func.count(Lead.id))
+        .filter(Lead.account_id == lead.account_id)
         .filter(Lead.sent_at >= today_start)
-        .scalar()
-        or 0
+        .scalar() or 0
     )
 
     if replies_sent_today >= MAX_DAILY_REPLIES:
         log.warning(
-            "Daily reply limit reached (%s/%s), skipping lead %s",
+            "Daily reply limit reached (%s/%s) for account %s, skipping lead %s",
             replies_sent_today,
             MAX_DAILY_REPLIES,
+            lead.account_id,
             lead.id,
         )
         return False
@@ -180,16 +239,11 @@ def send_reply(
         log.warning("Truncated reply for lead %s to 280 chars", lead.id)
 
     try:
-        # Import here to avoid circular imports
         from .threads_client import ThreadsClient
 
-        # Post the reply via Threads API
-        # Note: This assumes the client has a method to post replies
-        # The Threads API requires posting to the thread's replies endpoint
-        result = client._post(
-            f"/{lead.thread_id}/replies",
-            params={"text": reply_text},
-        )
+        account = session.get(Account, lead.account_id)
+        reply_client = client or ThreadsClient.from_account(account)
+        result = reply_client.create_reply(reply_to_id=lead.thread_id, text=reply_text)
 
         now = datetime.now(timezone.utc)
 
@@ -198,8 +252,22 @@ def send_reply(
         lead.sent_at = now
         session.commit()
 
+        # Write publish ledger entry
+        ledger = PublishLedger(
+            account_id=lead.account_id,
+            source_type="lead",
+            source_id=lead.id,
+            workflow_type="reply",
+            creation_id=result.get("creation_id"),
+            thread_id=result.get("id"),
+            status="published",
+        )
+        session.add(ledger)
+        session.commit()
+
         # Create LeadReply record for analytics tracking
         lead_reply = LeadReply(
+            account_id=lead.account_id,
             lead_id=lead.id,
             template_id=template_id,
             reply_text=reply_text,
@@ -234,7 +302,7 @@ def send_reply(
 def create_lead_from_post(
     session: Session,
     source: LeadSource,
-    post: dict,
+    post: dict[str, object],
     matched_keyword: str,
     your_user_id: str,
 ) -> Lead | None:
@@ -276,11 +344,12 @@ def create_lead_from_post(
         log.debug("Skipping post %s: %s", thread_id, reason)
         return None
 
-    # Check 30-day cooldown
+    # Check 30-day cooldown (account-scoped)
     cooldown_cutoff = datetime.now(timezone.utc) - timedelta(days=RECONTACT_COOLDOWN_DAYS)
     existing_recent = (
         session.query(Lead)
         .filter(
+            Lead.account_id == source.account_id,
             Lead.author_user_id == author_user_id,
             Lead.created_at >= cooldown_cutoff,
         )
@@ -296,11 +365,12 @@ def create_lead_from_post(
         )
         return None
 
-    # Check duplicate today (same day)
+    # Check duplicate today (same day, account-scoped)
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     existing_today = (
         session.query(Lead)
         .filter(
+            Lead.account_id == source.account_id,
             Lead.author_user_id == author_user_id,
             Lead.created_at >= today_start,
         )
@@ -320,23 +390,27 @@ def create_lead_from_post(
     if post_created_at_str:
         try:
             # Handle ISO format with offset
-            post_created_at = datetime.fromisoformat(
-                post_created_at_str.replace("Z", "+00:00")
-            )
+            post_created_at = datetime.fromisoformat(post_created_at_str.replace("Z", "+00:00"))
         except ValueError:
             log.warning("Could not parse post timestamp: %s", post_created_at_str)
 
-    # Check if this exact thread already exists
+    # Check if this exact thread already exists (account-scoped)
     existing_thread = (
-        session.query(Lead).filter(Lead.thread_id == thread_id).first()
+        session.query(Lead)
+        .filter(Lead.account_id == source.account_id)
+        .filter(Lead.thread_id == thread_id)
+        .first()
     )
 
     if existing_thread:
-        log.debug("Skipping post %s: thread already exists as lead %s", thread_id, existing_thread.id)
+        log.debug(
+            "Skipping post %s: thread already exists as lead %s", thread_id, existing_thread.id
+        )
         return None
 
     # Create the lead
     lead = Lead(
+        account_id=source.account_id,
         source_id=source.id,
         thread_id=thread_id,
         author_username=author_username,

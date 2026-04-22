@@ -12,18 +12,15 @@ Methods used (all designed for small samples and skewed distributions):
 from __future__ import annotations
 
 import logging
-import random
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Iterable
 
 import numpy as np
 from scipy.stats import mannwhitneyu
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .config import get_settings
 from .metrics import (
     METRIC_FOLLOWER_VELOCITY,
     METRIC_REACH_RATE,
@@ -81,6 +78,7 @@ def _evaluate_per_post(session: Session, experiment: Experiment) -> VerdictResul
     and run Mann-Whitney U on the primary metric values."""
     posts = session.scalars(
         select(MyPost).where(
+            MyPost.account_id == experiment.account_id,
             MyPost.created_at >= experiment.variant_start,
             MyPost.created_at < experiment.variant_end,
         )
@@ -90,7 +88,9 @@ def _evaluate_per_post(session: Session, experiment: Experiment) -> VerdictResul
 
     latest_insights: dict[str, MyPostInsight] = {}
     all_ins = session.scalars(
-        select(MyPostInsight).order_by(MyPostInsight.fetched_at.desc())
+        select(MyPostInsight)
+        .where(MyPostInsight.account_id == experiment.account_id)
+        .order_by(MyPostInsight.fetched_at.desc())
     ).all()
     for ins in all_ins:
         latest_insights.setdefault(ins.thread_id, ins)
@@ -107,7 +107,12 @@ def _evaluate_per_post(session: Session, experiment: Experiment) -> VerdictResul
         ins = latest_insights.get(post.thread_id)
         if ins is None:
             continue
-        val = _post_metric_value(experiment.primary_metric, ins, session=session)
+        val = _post_metric_value(
+            experiment.primary_metric,
+            ins,
+            session=session,
+            account_id=experiment.account_id,
+        )
         if val is None:
             continue
         classifications.append((post.thread_id, cls.bucket, cls.reason))
@@ -126,6 +131,7 @@ def _evaluate_per_post(session: Session, experiment: Experiment) -> VerdictResul
     for post_id, bucket, reason in classifications:
         session.add(
             ExperimentPostClassification(
+                account_id=experiment.account_id,
                 experiment_id=experiment.id,
                 post_thread_id=post_id,
                 bucket=bucket,
@@ -161,26 +167,26 @@ def _evaluate_per_post(session: Session, experiment: Experiment) -> VerdictResul
 def _evaluate_per_window(session: Session, experiment: Experiment) -> VerdictResult:
     """For cadence/engagement experiments: compare the metric on the variant
     window against the baseline window as two aggregate values."""
-    if (
-        experiment.baseline_start is None
-        or experiment.baseline_end is None
-    ):
+    if experiment.baseline_start is None or experiment.baseline_end is None:
         return _insufficient("baseline window not set")
 
     variant_mv = compute_metric(
-        session, experiment.primary_metric, experiment.variant_start, experiment.variant_end
+        session,
+        experiment.primary_metric,
+        experiment.variant_start,
+        experiment.variant_end,
+        experiment.account_id,
     )
     baseline_mv = compute_metric(
         session,
         experiment.primary_metric,
         experiment.baseline_start,
         experiment.baseline_end,
+        experiment.account_id,
     )
 
     if variant_mv.value is None or baseline_mv.value is None:
-        return _insufficient(
-            f"metric '{experiment.primary_metric}' not computable on both windows"
-        )
+        return _insufficient(f"metric '{experiment.primary_metric}' not computable on both windows")
 
     if variant_mv.n_posts < MIN_N_PER_BUCKET or baseline_mv.n_posts < MIN_N_PER_BUCKET:
         return VerdictResult(
@@ -203,10 +209,18 @@ def _evaluate_per_window(session: Session, experiment: Experiment) -> VerdictRes
     # For per-window we don't have individual samples to run Mann-Whitney on —
     # so we do a bootstrap on the per-post values in each window.
     variant_rows = _per_post_metric_values(
-        session, experiment.primary_metric, experiment.variant_start, experiment.variant_end
+        session,
+        experiment.primary_metric,
+        experiment.variant_start,
+        experiment.variant_end,
+        experiment.account_id,
     )
     baseline_rows = _per_post_metric_values(
-        session, experiment.primary_metric, experiment.baseline_start, experiment.baseline_end
+        session,
+        experiment.primary_metric,
+        experiment.baseline_start,
+        experiment.baseline_end,
+        experiment.account_id,
     )
     return _stat_verdict(
         variant_values=variant_rows,
@@ -229,9 +243,7 @@ def _stat_verdict(
 
     # Mann-Whitney U (two-sided)
     try:
-        u_stat, p_value = mannwhitneyu(
-            variant_values, control_values, alternative="two-sided"
-        )
+        u_stat, p_value = mannwhitneyu(variant_values, control_values, alternative="two-sided")
         p_value = float(p_value)
     except Exception as exc:  # noqa: BLE001
         log.warning("mannwhitneyu failed: %s", exc)
@@ -352,7 +364,7 @@ def _write_interpretation(
 
 
 def _post_metric_value(
-    metric_name: str, ins: MyPostInsight, session: Session
+    metric_name: str, ins: MyPostInsight, session: Session, account_id: int
 ) -> float | None:
     """Return a per-post value for the given metric, for use in per-post statistical tests.
 
@@ -367,7 +379,10 @@ def _post_metric_value(
         from .models import MyAccountInsight
 
         acc = session.scalar(
-            select(MyAccountInsight).order_by(MyAccountInsight.fetched_at.desc()).limit(1)
+            select(MyAccountInsight)
+            .where(MyAccountInsight.account_id == account_id)
+            .order_by(MyAccountInsight.fetched_at.desc())
+            .limit(1)
         )
         followers = acc.follower_count if acc else 0
         if followers == 0:
@@ -399,14 +414,20 @@ def _post_metric_value(
 
 
 def _per_post_metric_values(
-    session: Session, metric_name: str, since: datetime, until: datetime
+    session: Session, metric_name: str, since: datetime, until: datetime, account_id: int
 ) -> list[float]:
     posts = session.scalars(
-        select(MyPost).where(MyPost.created_at >= since, MyPost.created_at < until)
+        select(MyPost).where(
+            MyPost.account_id == account_id,
+            MyPost.created_at >= since,
+            MyPost.created_at < until,
+        )
     ).all()
     latest: dict[str, MyPostInsight] = {}
     for ins in session.scalars(
-        select(MyPostInsight).order_by(MyPostInsight.fetched_at.desc())
+        select(MyPostInsight)
+        .where(MyPostInsight.account_id == account_id)
+        .order_by(MyPostInsight.fetched_at.desc())
     ).all():
         latest.setdefault(ins.thread_id, ins)
     out: list[float] = []
@@ -414,7 +435,7 @@ def _per_post_metric_values(
         ins = latest.get(p.thread_id)
         if ins is None:
             continue
-        v = _post_metric_value(metric_name, ins, session)
+        v = _post_metric_value(metric_name, ins, session, account_id)
         if v is not None:
             out.append(v)
     return out
@@ -450,7 +471,7 @@ def persist_verdict(session: Session, experiment: Experiment, result: VerdictRes
     """Upsert an ExperimentVerdict row for the given experiment."""
     existing = session.get(ExperimentVerdict, experiment.id)
     if existing is None:
-        existing = ExperimentVerdict(experiment_id=experiment.id)
+        existing = ExperimentVerdict(account_id=experiment.account_id, experiment_id=experiment.id)
         session.add(existing)
     existing.verdict = result.verdict
     existing.primary_metric_baseline = result.primary_metric_baseline

@@ -4,185 +4,270 @@
 <div class="composer-header">
   <h1>Brand Composer</h1>
   <div class="brand-score-display" id="score-display">
-    Score: <span id="score-value">--</span>/100
+    <span id="score-value">--</span><span class="score-max">/100</span>
   </div>
 </div>
 
 <p class="muted">
-  Write with your voice. The composer checks against your 
-  <a href="/you">You profile</a> in real-time.
+  Write with your voice. The composer checks against your
+  <a href="{{ account_path_prefix }}/you">You profile</a> in real-time.
 </p>
 
-<div class="composer-container">
-  <!-- Textarea -->
-  <textarea 
-    id="compose-text" 
-    placeholder="Write your post..."
-    rows="10"
-  ></textarea>
-  
-  <!-- Live analysis -->
-  <div id="analysis-panel" class="analysis-panel hidden">
-    <div class="score-bar">
-      <div id="score-bar-fill" class="score-bar-fill"></div>
+<div class="composer-layout">
+  <div class="composer-main">
+    <div class="textarea-wrap">
+      <textarea
+        id="compose-text"
+        placeholder="Write your Threads post..."
+        rows="10"
+      ></textarea>
+      <div class="char-count" id="char-count">0 / 500</div>
     </div>
-    
-    <div class="check-results">
-      <div id="protect-check" class="check-item">
-        <span class="check-icon">✓</span>
-        <span class="check-label">Protect list: Clear</span>
-      </div>
-      <div id="voice-check" class="check-item">
-        <span class="check-icon">✓</span>
-        <span class="check-label">Voice: Aligned</span>
-      </div>
-      <div id="double-down-check" class="check-item">
-        <span class="check-icon">✓</span>
-        <span class="check-label">Double-down: Present</span>
-      </div>
+
+    <div class="composer-actions">
+      <button id="check-btn" class="btn btn-secondary">Check Brand Alignment</button>
+      <button id="save-draft-btn" class="btn btn-secondary">Save Draft</button>
+      <button id="schedule-btn" class="btn btn-primary" disabled>Schedule Post</button>
     </div>
-    
-    <div id="suggestions" class="suggestions"></div>
+
+    <div id="analysis-panel" class="analysis-panel hidden">
+      <div class="score-bar">
+        <div id="score-bar-fill" class="score-bar-fill"></div>
+      </div>
+      <div class="score-label" id="score-label">Waiting for analysis...</div>
+
+      <div class="check-results">
+        <div id="protect-check" class="check-item">
+          <span class="check-icon">○</span>
+          <span class="check-label">Protect list</span>
+        </div>
+        <div id="voice-check" class="check-item">
+          <span class="check-icon">○</span>
+          <span class="check-label">Voice alignment</span>
+        </div>
+        <div id="double-down-check" class="check-item">
+          <span class="check-icon">○</span>
+          <span class="check-label">Double-down elements</span>
+        </div>
+      </div>
+
+      <div id="violations-panel" class="detail-panel hidden">
+        <div class="detail-title">Protect violations</div>
+        <ul id="violations-list" class="detail-list"></ul>
+      </div>
+
+      <div id="double-down-panel" class="detail-panel hidden">
+        <div class="detail-title">Double-down elements detected</div>
+        <ul id="double-down-list" class="detail-list"></ul>
+      </div>
+
+      <div id="suggestions" class="suggestions"></div>
+    </div>
   </div>
-  
-  <!-- Actions -->
-  <div class="composer-actions">
-    <button id="check-btn" class="btn btn-secondary">Check Brand Alignment</button>
-    <button id="save-draft-btn" class="btn btn-secondary">Save Draft</button>
-    <button id="schedule-btn" class="btn btn-primary" disabled>Schedule Post</button>
+
+  <div class="composer-sidebar">
+    <div class="sidebar-card">
+      <h3>Saved Drafts</h3>
+      <div id="drafts-list" class="drafts-list">
+        <p class="muted small">No drafts saved yet.</p>
+      </div>
+    </div>
+
+    <div class="sidebar-card hints-card">
+      <h3>Quick Tips</h3>
+      <ul class="hints-list">
+        <li>Lead with a strong hook</li>
+        <li>Keep it under 280 characters for best engagement</li>
+        <li>Use your protect list as a "do not say" checklist</li>
+        <li>Double-down on what makes your voice unique</li>
+      </ul>
+    </div>
   </div>
 </div>
 
 <script>
 (function() {
   const textarea = document.getElementById('compose-text');
+  const charCount = document.getElementById('char-count');
   const analysisPanel = document.getElementById('analysis-panel');
   const scoreDisplay = document.getElementById('score-value');
   const scoreBarFill = document.getElementById('score-bar-fill');
+  const scoreLabel = document.getElementById('score-label');
   const protectCheck = document.getElementById('protect-check');
   const voiceCheck = document.getElementById('voice-check');
   const doubleDownCheck = document.getElementById('double-down-check');
+  const violationsPanel = document.getElementById('violations-panel');
+  const violationsList = document.getElementById('violations-list');
+  const doubleDownPanel = document.getElementById('double-down-panel');
+  const doubleDownList = document.getElementById('double-down-list');
   const suggestionsDiv = document.getElementById('suggestions');
   const scheduleBtn = document.getElementById('schedule-btn');
   const checkBtn = document.getElementById('check-btn');
-  
+  const saveDraftBtn = document.getElementById('save-draft-btn');
+  const draftsList = document.getElementById('drafts-list');
+
   let debounceTimer = null;
-  
-  // Score color classes
+
   function getScoreColor(score) {
-    if (score >= 90) return 'score-excellent';
+    if (score >= 85) return 'score-excellent';
     if (score >= 70) return 'score-good';
     if (score >= 50) return 'score-warning';
     return 'score-danger';
   }
-  
+
   function getScoreLabel(score) {
-    if (score >= 90) return 'Strong brand alignment';
-    if (score >= 70) return 'Good, minor tweaks suggested';
-    if (score >= 50) return 'Off-brand risk';
-    return 'Significant violations';
+    if (score >= 85) return 'Strong brand alignment';
+    if (score >= 70) return 'Good — minor tweaks suggested';
+    if (score >= 50) return 'Off-brand risk — review suggested';
+    return 'Significant violations — fix before posting';
   }
-  
-  // Update check item display
-  function updateCheckItem(element, passed, text, details) {
+
+  function updateCheckItem(element, passed, label) {
     const icon = element.querySelector('.check-icon');
-    const label = element.querySelector('.check-label');
-    
-    if (passed) {
-      element.classList.remove('check-fail');
-      element.classList.add('check-pass');
-      icon.textContent = '✓';
-    } else {
-      element.classList.remove('check-pass');
-      element.classList.add('check-fail');
-      icon.textContent = '✗';
-    }
-    label.textContent = text;
+    const lbl = element.querySelector('.check-label');
+    element.classList.remove('check-pass', 'check-fail', 'check-warn');
+    icon.textContent = passed ? '✓' : '✗';
+    element.classList.add(passed ? 'check-pass' : 'check-fail');
+    lbl.textContent = label;
   }
-  
-  // Update UI with analysis result
+
+  function renderDrafts() {
+    const drafts = JSON.parse(localStorage.getItem('composer_drafts') || '[]');
+    drafts.reverse();
+    if (drafts.length === 0) {
+      draftsList.innerHTML = '<p class="muted small">No drafts saved yet.</p>';
+      return;
+    }
+    draftsList.innerHTML = '';
+    drafts.forEach(function(draft, idx) {
+      const item = document.createElement('div');
+      item.className = 'draft-item';
+      const preview = (draft.text || '').substring(0, 45) + ((draft.text || '').length > 45 ? '...' : '');
+      const time = new Date(draft.saved_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      item.innerHTML = '<div class="draft-preview" title="' + escapeHtml(draft.text) + '">' + escapeHtml(preview) + '</div>' +
+        '<div class="draft-meta">' + time +
+        ' <button class="draft-load" data-idx="' + idx + '">Load</button>' +
+        '<button class="draft-delete" data-idx="' + idx + '">Delete</button></div>';
+      draftsList.appendChild(item);
+    });
+
+    draftsList.querySelectorAll('.draft-load').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(btn.dataset.idx, 10);
+        const all = JSON.parse(localStorage.getItem('composer_drafts') || '[]');
+        all.reverse();
+        if (all[idx]) {
+          textarea.value = all[idx].text;
+          updateCharCount();
+          runBrandCheck();
+        }
+      });
+    });
+
+    draftsList.querySelectorAll('.draft-delete').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(btn.dataset.idx, 10);
+        let all = JSON.parse(localStorage.getItem('composer_drafts') || '[]');
+        all.reverse();
+        all.splice(idx, 1);
+        all.reverse();
+        localStorage.setItem('composer_drafts', JSON.stringify(all));
+        renderDrafts();
+      });
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function updateCharCount() {
+    const len = textarea.value.length;
+    charCount.textContent = len + ' / 500';
+    charCount.classList.toggle('over-limit', len > 500);
+  }
+
   function updateUI(result) {
     analysisPanel.classList.remove('hidden');
-    
-    // Score display
+
     scoreDisplay.textContent = result.score;
     scoreDisplay.className = getScoreColor(result.score);
-    
-    // Score bar
-    scoreBarFill.style.width = result.score + '%';
+
+    scoreBarFill.style.width = Math.min(100, Math.max(0, result.score)) + '%';
     scoreBarFill.className = 'score-bar-fill ' + getScoreColor(result.score);
-    
-    // Check items
+
+    scoreLabel.textContent = getScoreLabel(result.score);
+    scoreLabel.className = 'score-label ' + getScoreColor(result.score);
+
     const violations = result.violations || [];
     updateCheckItem(
       protectCheck,
       violations.length === 0,
-      violations.length === 0 ? 'Protect list: Clear' : `Protect list: ${violations.length} violation${violations.length > 1 ? 's' : ''}`,
-      violations
+      violations.length === 0 ? 'Protect list: Clear' : 'Protect list: ' + violations.length + ' violation' + (violations.length > 1 ? 's' : '')
     );
-    
+
     updateCheckItem(
       voiceCheck,
       result.score >= 70,
-      result.score >= 70 ? 'Voice: Aligned' : 'Voice: Needs adjustment',
-      null
+      result.score >= 70 ? 'Voice: Aligned' : 'Voice: Needs adjustment'
     );
-    
+
+    const dde = result.double_down_elements || [];
     updateCheckItem(
       doubleDownCheck,
-      result.score >= 70,
-      result.score >= 70 ? 'Double-down: Present' : 'Double-down: Missing',
-      null
+      dde.length > 0,
+      dde.length > 0 ? 'Double-down: ' + dde.length + ' present' : 'Double-down: Missing'
     );
-    
-    // Suggestions
+
+    violationsPanel.classList.toggle('hidden', violations.length === 0);
+    violationsList.innerHTML = '';
+    violations.forEach(function(v) {
+      const li = document.createElement('li');
+      li.textContent = v;
+      violationsList.appendChild(li);
+    });
+
+    doubleDownPanel.classList.toggle('hidden', dde.length === 0);
+    doubleDownList.innerHTML = '';
+    dde.forEach(function(d) {
+      const li = document.createElement('li');
+      li.textContent = d;
+      doubleDownList.appendChild(li);
+    });
+
     suggestionsDiv.innerHTML = '';
     if (result.suggestions && result.suggestions.length > 0) {
-      const suggestionsHeader = document.createElement('div');
-      suggestionsHeader.className = 'suggestions-header';
-      suggestionsHeader.textContent = 'Suggestions';
-      suggestionsDiv.appendChild(suggestionsHeader);
-      
+      const header = document.createElement('div');
+      header.className = 'suggestions-header';
+      header.textContent = 'Suggestions';
+      suggestionsDiv.appendChild(header);
+
       result.suggestions.forEach(function(sugg) {
         const card = document.createElement('div');
         card.className = 'suggestion-card';
-        
-        const issue = document.createElement('div');
-        issue.className = 'suggestion-issue';
-        issue.textContent = sugg.issue;
-        
-        const suggestion = document.createElement('div');
-        suggestion.className = 'suggestion-text';
-        suggestion.textContent = sugg.suggestion;
-        
-        card.appendChild(issue);
-        card.appendChild(suggestion);
+        card.innerHTML = '<div class="suggestion-issue">' + escapeHtml(sugg.issue) + '</div>' +
+          '<div class="suggestion-text">' + escapeHtml(sugg.suggestion) + '</div>';
         suggestionsDiv.appendChild(card);
       });
     }
-    
-    // Enable/disable schedule button
-    scheduleBtn.disabled = result.score < 70;
-    if (result.score < 70) {
-      scheduleBtn.title = 'Score must be 70+ to schedule';
-    } else {
-      scheduleBtn.title = '';
-    }
+
+    scheduleBtn.disabled = result.score < 70 || textarea.value.length > 500;
+    scheduleBtn.title = scheduleBtn.disabled ? (textarea.value.length > 500 ? 'Over 500 characters' : 'Score must be 70+ to schedule') : '';
   }
-  
-  // Run brand check
+
   function runBrandCheck() {
     const text = textarea.value.trim();
-    
-    if (text.length < 10) {
+    if (text.length < 5) {
       analysisPanel.classList.add('hidden');
       return;
     }
-    
+
     const formData = new FormData();
     formData.append('text', text);
-    
-    fetch('/api/brand-check', {
+
+    fetch('{{ account_path_prefix }}/api/brand-check', {
       method: 'POST',
       body: formData
     })
@@ -194,49 +279,72 @@
       console.error('Brand check failed:', err);
     });
   }
-  
-  // Debounced analysis
+
   function debouncedCheck() {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(runBrandCheck, 500);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runBrandCheck, 600);
   }
-  
-  // Event listeners
-  textarea.addEventListener('input', debouncedCheck);
-  
-  checkBtn.addEventListener('click', function() {
-    runBrandCheck();
+
+  textarea.addEventListener('input', function() {
+    updateCharCount();
+    debouncedCheck();
   });
-  
+
+  checkBtn.addEventListener('click', runBrandCheck);
+
   saveDraftBtn.addEventListener('click', function() {
     const text = textarea.value.trim();
     if (!text) return;
-    
-    // Save to localStorage for now
     const drafts = JSON.parse(localStorage.getItem('composer_drafts') || '[]');
-    drafts.push({
-      text: text,
-      saved_at: new Date().toISOString()
-    });
+    drafts.push({ text: text, saved_at: new Date().toISOString() });
     localStorage.setItem('composer_drafts', JSON.stringify(drafts));
-    
-    const btn = document.getElementById('save-draft-btn');
-    const originalText = btn.textContent;
-    btn.textContent = 'Saved!';
-    setTimeout(function() {
-      btn.textContent = originalText;
-    }, 1500);
+    renderDrafts();
+    const original = saveDraftBtn.textContent;
+    saveDraftBtn.textContent = 'Saved!';
+    setTimeout(function() { saveDraftBtn.textContent = original; }, 1500);
   });
-  
-  scheduleBtn.addEventListener('click', function() {
+
+  scheduleBtn.addEventListener('click', async function() {
     const text = textarea.value.trim();
     if (!text) return;
-    
-    // For now, just show a message
-    alert('Scheduling integration coming soon!\n\nPost preview:\n' + text.substring(0, 100) + '...');
+    scheduleBtn.disabled = true;
+    const original = scheduleBtn.textContent;
+    scheduleBtn.textContent = 'Scheduling...';
+    try {
+      const createResp = await fetch('{{ account_path_prefix }}/api/content/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({concept: text})
+      });
+      const createData = await createResp.json();
+      if (!createData.success) {
+        alert(createData.error || 'Failed to create post');
+        scheduleBtn.disabled = false;
+        scheduleBtn.textContent = original;
+        return;
+      }
+      const scheduleResp = await fetch(`{{ account_path_prefix }}/api/content/${createData.idea_id}/schedule`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({time_slot: 'tomorrow-9am'})
+      });
+      const scheduleData = await scheduleResp.json();
+      if (scheduleData.success) {
+        window.location.href = '{{ account_path_prefix }}/calendar';
+      } else {
+        alert(scheduleData.error || 'Failed to schedule');
+        scheduleBtn.disabled = false;
+        scheduleBtn.textContent = original;
+      }
+    } catch (e) {
+      alert('Network error');
+      scheduleBtn.disabled = false;
+      scheduleBtn.textContent = original;
+    }
   });
+
+  updateCharCount();
+  renderDrafts();
 })();
 </script>
 
@@ -245,28 +353,40 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .brand-score-display {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   padding: 0.5rem 1rem;
-  background: var(--bg-secondary, #f5f5f5);
+  background: var(--surface-sunken);
   border-radius: 8px;
+  color: var(--text-muted);
 }
 
-#score-value {
-  transition: color 0.3s ease;
+.score-max {
+  font-size: 0.9em;
+  color: var(--text-muted);
 }
 
-.score-excellent { color: #22c55e; }
-.score-good { color: #84cc16; }
-.score-warning { color: #f59e0b; }
-.score-danger { color: #ef4444; }
+.composer-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
 
-.composer-container {
-  max-width: 800px;
+@media (max-width: 900px) {
+  .composer-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.textarea-wrap {
+  position: relative;
 }
 
 #compose-text {
@@ -274,27 +394,40 @@
   padding: 1rem;
   font-size: 1rem;
   line-height: 1.6;
-  border: 2px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--border);
   border-radius: 12px;
   resize: vertical;
-  min-height: 200px;
+  min-height: 220px;
   font-family: inherit;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #111);
-  transition: border-color 0.2s ease;
+  background: var(--surface);
+  color: var(--text-body);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 #compose-text:focus {
   outline: none;
-  border-color: var(--accent-color, #6366f1);
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px rgba(0, 149, 246, 0.12);
+}
+
+.char-count {
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+.char-count.over-limit {
+  color: var(--neg);
+  font-weight: 600;
 }
 
 .analysis-panel {
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
   padding: 1.25rem;
-  background: var(--bg-secondary, #f9fafb);
+  background: var(--surface);
   border-radius: 12px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--border);
 }
 
 .analysis-panel.hidden {
@@ -304,66 +437,94 @@
 .score-bar {
   width: 100%;
   height: 8px;
-  background: var(--bg-tertiary, #e5e5e5);
+  background: var(--surface-sunken);
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .score-bar-fill {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.5s ease, background-color 0.3s ease;
-  background-color: #9ca3af;
+  transition: width 0.4s ease, background-color 0.3s ease;
+  background-color: var(--text-faint);
 }
 
-.score-bar-fill.score-excellent { background-color: #22c55e; }
-.score-bar-fill.score-good { background-color: #84cc16; }
-.score-bar-fill.score-warning { background-color: #f59e0b; }
-.score-bar-fill.score-danger { background-color: #ef4444; }
+.score-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+
+.score-excellent { color: var(--pos); background-color: var(--pos); }
+.score-good { color: var(--pos); background-color: var(--pos); }
+.score-warning { color: var(--warn); background-color: var(--warn); }
+.score-danger { color: var(--neg); background-color: var(--neg); }
 
 .check-results {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
 .check-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   font-size: 0.9rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  background: var(--surface-sunken);
 }
 
 .check-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .check-pass .check-icon {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--pos-bg);
+  color: var(--pos);
 }
 
 .check-fail .check-icon {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--neg-bg);
+  color: var(--neg);
 }
 
-.check-pass .check-label {
-  color: var(--text-primary, #111);
+.detail-panel {
+  margin-bottom: 1rem;
+  padding: 0.875rem 1rem;
+  background: var(--surface-sunken);
+  border-radius: 8px;
 }
 
-.check-fail .check-label {
-  color: #dc2626;
-  font-weight: 500;
+.detail-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.detail-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.detail-list li {
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-body);
 }
 
 .suggestions {
@@ -371,38 +532,38 @@
 }
 
 .suggestions-header {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-secondary, #666);
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   margin-bottom: 0.75rem;
 }
 
 .suggestion-card {
   padding: 0.875rem;
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e5e5e5);
+  background: var(--surface-sunken);
   border-radius: 8px;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 
 .suggestion-issue {
   font-weight: 600;
-  color: #dc2626;
+  color: var(--neg);
   margin-bottom: 0.25rem;
   font-size: 0.9rem;
 }
 
 .suggestion-text {
-  color: var(--text-secondary, #666);
+  color: var(--text-muted);
   font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .composer-actions {
   display: flex;
   gap: 0.75rem;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
   flex-wrap: wrap;
 }
 
@@ -417,24 +578,23 @@
 }
 
 .composer-actions .btn-secondary {
-  background: var(--bg-secondary, #f5f5f5);
-  color: var(--text-primary, #111);
-  border-color: var(--border-color, #e5e5e5);
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  border-color: var(--border);
 }
 
 .composer-actions .btn-secondary:hover {
-  background: var(--bg-tertiary, #e5e5e5);
+  background: var(--surface-hover);
 }
 
 .composer-actions .btn-primary {
-  background: #6366f1;
+  background: var(--link);
   color: white;
-  border-color: #6366f1;
+  border-color: var(--link);
 }
 
 .composer-actions .btn-primary:hover:not(:disabled) {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  filter: brightness(0.95);
 }
 
 .composer-actions .btn-primary:disabled {
@@ -442,22 +602,98 @@
   cursor: not-allowed;
 }
 
+.composer-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sidebar-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.sidebar-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.drafts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.draft-item {
+  padding: 0.6rem;
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.draft-preview {
+  color: var(--text-body);
+  margin-bottom: 0.35rem;
+  cursor: pointer;
+}
+
+.draft-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.draft-load, .draft-delete {
+  background: transparent;
+  border: none;
+  color: var(--link);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+}
+
+.draft-delete {
+  color: var(--neg);
+  margin-left: auto;
+}
+
+.hints-card {
+  background: var(--surface);
+}
+
+.hints-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.hints-list li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .composer-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
   }
-  
+
   .check-results {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .composer-actions {
     flex-direction: column;
   }
-  
+
   .composer-actions .btn {
     width: 100%;
   }

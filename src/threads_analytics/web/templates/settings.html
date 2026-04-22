@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="settings-header">
+  <h1>Settings</h1>
+  <p class="muted">Configure API connections and preferences for {{ account_name }}</p>
+</div>
+
+<div class="settings-grid">
+  <section class="settings-card">
+    <div class="settings-card-header">
+      <div class="settings-icon">🔗</div>
+      <div>
+        <h2>Threads API</h2>
+        <p class="muted small">Connection to your Threads account</p>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Access Token</span>
+      <span class="setting-value {{ 'success' if threads_token_status.startswith('✅') else 'error' }}">{{ threads_token_status }}</span>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">User ID</span>
+      <span class="setting-value {{ 'success' if threads_user_status.startswith('✅') else 'error' }}">{{ threads_user_status }}</span>
+    </div>
+    {% if threads_user_id %}
+    <div class="setting-row">
+      <span class="setting-label">Account ID</span>
+      <span class="setting-value">{{ threads_user_id }}</span>
+    </div>
+    {% endif %}
+    <div class="help-text">
+      To update credentials, edit the <code>.env</code> file and restart the server.
+      Required permissions: <code>threads_basic</code>, <code>threads_content_publish</code>, <code>threads_manage_insights</code>.
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="settings-card-header">
+      <div class="settings-icon">🤖</div>
+      <div>
+        <h2>AI Provider</h2>
+        <p class="muted small">LLM for content generation and analysis</p>
+      </div>
+    </div>
+    
+    <div class="setting-row">
+      <span class="setting-label">Current Provider</span>
+      <span class="setting-value">{{ llm_provider }}</span>
+    </div>
+    
+    <div class="help-text">
+      Configure in <code>.env</code>. Supported: <code>openrouter</code>, <code>anthropic</code>.
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="settings-card-header">
+      <div class="settings-icon">📊</div>
+      <div>
+        <h2>Database</h2>
+        <p class="muted small">Local data storage</p>
+      </div>
+    </div>
+    
+    <div class="setting-row">
+      <span class="setting-label">Location</span>
+      <span class="setting-value">data/threads.db</span>
+    </div>
+    
+    <div class="help-text">
+      SQLite database storing your posts, insights, and generated content ideas.
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="settings-card-header">
+      <div class="settings-icon">⏰</div>
+      <div>
+        <h2>Timezone</h2>
+        <p class="muted small">When scheduled posts go live</p>
+      </div>
+    </div>
+    
+    <div class="setting-row">
+      <span class="setting-label">Posting Timezone</span>
+      <span class="setting-value">Jakarta (WIB, UTC+7)</span>
+    </div>
+    
+    <div class="help-text">
+      All scheduled times are interpreted as Jakarta timezone.
+    </div>
+  </section>
+</div>
+
+<style>
+.settings-header {
+  margin-bottom: 1.5rem;
+}
+
+.settings-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.settings-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  border-radius: 10px;
+  font-size: 1.25rem;
+}
+
+.settings-card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.setting-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.setting-value.success {
+  color: var(--pos);
+}
+
+.setting-value.error {
+  color: var(--neg);
+}
+
+.help-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.help-text code {
+  background: var(--surface-sunken);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+{% endblock %}

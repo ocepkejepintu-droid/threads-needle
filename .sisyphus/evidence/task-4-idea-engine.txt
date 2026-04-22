@@ -1,0 +1,10 @@
+Task 4: Unify idea generation — verification evidence
+
+Verification:
+- pytest tests/test_content_pipeline.py -q => 2 passed
+- ruff check src/threads_analytics/idea_generator.py src/threads_analytics/cli.py src/threads_analytics/pipeline.py src/threads_analytics/web/routes_growth.py => All checks passed
+- ls src/threads_analytics/growth_generator.py => No such file or directory (deleted)
+- grep generate_ideas src/threads_analytics/cli.py => single generate-ideas command at line 586
+- grep "from .*growth_generator" src/threads_analytics/pipeline.py src/threads_analytics/cli.py src/threads_analytics/web/routes_growth.py => no matches
+
+Conclusion: idea_generator.py is the canonical engine; pipeline, CLI, and routes all use it; duplicate CLI registration removed; growth_generator.py retired.

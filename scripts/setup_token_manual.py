@@ -119,7 +119,7 @@ def main():
     # Get username
     print("Fetching user info...")
     me_response = httpx.get(
-        f"https://graph.threads.net/v1.0/me",
+        "https://graph.threads.net/v1.0/me",
         params={"access_token": access_token, "fields": "username"}
     )
     username = None

@@ -1,13 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Topics extracted from your content</h1>
+<p class="muted">
+  Recurring themes discovered across your posts. These feed the affinity creator search
+  and help the suggestion engine ground its proposals in your actual content.
+</p>
+
 {% if topics %}
   <div class="topic-grid">
     {% for t in topics %}
       <div class="card topic-card">
         <h3>{{ t.label }}</h3>
         <p>{{ t.description }}</p>
-        <div class="muted small">
+        <div class="topic-meta">
           {% if t.last_searched_at %}
             Last searched: {{ t.last_searched_at.strftime("%Y-%m-%d %H:%M") }}
           {% else %}
@@ -18,6 +23,75 @@
     {% endfor %}
   </div>
 {% else %}
-  <p class="muted">No topics extracted yet. Run the pipeline first.</p>
+  <div class="empty-state card">
+    <div class="empty-icon">🏷️</div>
+    <h3>No topics extracted yet</h3>
+    <p class="muted">
+      Run the pipeline to extract recurring themes from your posts. Topics power the affinity creator
+      discovery and help Claude generate more relevant content suggestions.
+    </p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="triggerRun()">Run pipeline now</button>
+      <a href="{{ account_path_prefix }}/posts" class="btn">Browse posts</a>
+    </div>
+  </div>
 {% endif %}
+
+<style>
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.topic-card {
+  padding: 20px 22px;
+  margin: 0;
+  transition: background var(--dur-fast) var(--ease);
+}
+.topic-card:hover {
+  background: var(--surface-hover);
+}
+.topic-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.topic-card p {
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.topic-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.empty-state {
+  text-align: center;
+  padding: 48px 28px;
+}
+.empty-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.empty-state .muted {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+</style>
 {% endblock %}

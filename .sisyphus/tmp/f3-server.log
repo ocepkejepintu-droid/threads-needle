@@ -1,0 +1,11 @@
+INFO:     Started server process [55142]
+INFO:     Waiting for application startup.
+2026-04-17 04:54:18,216 INFO threads_analytics.scheduler: Publisher scheduler started
+2026-04-17 04:54:18,217 INFO threads_analytics.scheduler: Scheduler thread started
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8000): address already in use
+INFO:     Waiting for application shutdown.
+2026-04-17 04:54:18,224 INFO threads_analytics.scheduler: Stopping scheduler...
+2026-04-17 04:54:18,224 INFO threads_analytics.scheduler: Publisher scheduler stopped
+2026-04-17 04:54:18,224 INFO threads_analytics.scheduler: Scheduler stopped
+INFO:     Application shutdown complete.

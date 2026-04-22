@@ -2,12 +2,20 @@
 {% block content %}
 
 <div class="ideas-header">
-  <h1>Generated Ideas</h1>
-  <form method="post" action="/growth/ideas/generate">
-    <button type="submit" class="btn btn-primary">Generate 5 New Ideas</button>
+  <h1>Content Ideas</h1>
+  <form method="post" action="{{ account_path_prefix }}/growth/ideas/generate" class="generate-form" id="generate-form">
+    <input type="text" name="topic" placeholder="Topic (e.g., hiring developers)" class="topic-input" id="topic-input">
+    <button type="submit" class="btn btn-primary" id="generate-btn">Generate Ideas</button>
   </form>
 </div>
 
+<div class="ideas-tabs">
+  <a href="{{ account_path_prefix }}/growth/ideas?status=draft" class="tab {% if current_status == 'draft' %}active{% endif %}">Draft</a>
+  <a href="{{ account_path_prefix }}/growth/ideas?status=scheduled" class="tab {% if current_status == 'scheduled' %}active{% endif %}">Scheduled</a>
+  <a href="{{ account_path_prefix }}/growth/ideas?status=published" class="tab {% if current_status == 'published' %}active{% endif %}">Published</a>
+</div>
+
+{% if ideas %}
 <div class="ideas-grid">
   {% for idea in ideas %}
   <div class="idea-card status-{{ idea.status }}">
@@ -18,17 +26,295 @@
     
     <div class="idea-meta">
       <span>Predicted: {{ idea.predicted_views_range }}</span>
-      <span>Patterns: {{ idea.patterns_used|length }}</span>
+      {% if idea.scheduled_at %}
+      <span class="scheduled-time">{{ idea.scheduled_at.strftime('%a %H:%M') }}</span>
+      {% endif %}
     </div>
     
     <div class="idea-actions">
       {% if idea.status == 'draft' %}
-      <a href="/growth/ideas/{{ idea.id }}/approve" class="btn btn-sm btn-primary">Approve</a>
-      <a href="/growth/ideas/{{ idea.id }}/dismiss" class="btn btn-sm btn-secondary">Dismiss</a>
+      <div class="schedule-dropdown">
+        <button class="btn btn-sm btn-primary schedule-btn" data-idea-id="{{ idea.id }}">Schedule ▼</button>
+        <div class="schedule-menu" id="menu-{{ idea.id }}">
+          <div class="schedule-option" data-time="next-fri-9am">Next Fri 9am</div>
+          <div class="schedule-option" data-time="next-fri-10am">Next Fri 10am</div>
+          <div class="schedule-option" data-time="tomorrow-9am">Tomorrow 9am</div>
+        </div>
+      </div>
+      <a href="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/edit" class="btn btn-sm btn-secondary">Edit</a>
+      <a href="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/dismiss" class="btn btn-sm btn-danger">Dismiss</a>
+      {% elif idea.status == 'scheduled' %}
+      <a href="{{ account_path_prefix }}/calendar" class="btn btn-sm btn-secondary">View in Calendar</a>
       {% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty-state card">
+  <div class="empty-icon">💡</div>
+  <h3>No {{ current_status }} ideas yet</h3>
+  <p class="muted">
+    {% if current_status == 'draft' %}
+      Generate content ideas above, or run the pipeline to auto-create suggestions based on your growth patterns.
+    {% elif current_status == 'scheduled' %}
+      Schedule draft ideas to see them here. You can schedule from the Draft tab or the Content Pipeline.
+    {% else %}
+      Published ideas will appear here once they go live.
+    {% endif %}
+  </p>
+  <div class="empty-actions">
+    {% if current_status == 'scheduled' %}
+      <a href="{{ account_path_prefix }}/growth/ideas?status=draft" class="btn btn-primary">Browse drafts</a>
+      <a href="{{ account_path_prefix }}/content" class="btn">Content Pipeline</a>
+    {% else %}
+      <button class="btn btn-primary" onclick="document.getElementById('topic-input').focus()">Generate ideas</button>
+      <a href="{{ account_path_prefix }}/content" class="btn">Content Pipeline</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<style>
+.ideas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.generate-form {
+  display: flex;
+  gap: 12px;
+}
+
+.topic-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 250px;
+}
+
+.ideas-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.tab {
+  padding: 8px 16px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--surface-sunken);
+}
+
+.tab.active {
+  color: var(--link);
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+
+.ideas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.idea-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+}
+
+.idea-card.status-scheduled {
+  border-color: var(--link);
+  box-shadow: 0 0 0 1px var(--link);
+}
+
+.idea-score {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--surface-sunken);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.idea-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  padding-right: 60px;
+}
+
+.idea-concept {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.idea-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.scheduled-time {
+  color: var(--link);
+  font-weight: 600;
+}
+
+.idea-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.schedule-dropdown {
+  position: relative;
+}
+
+.schedule-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 100;
+  min-width: 160px;
+  margin-top: 4px;
+}
+
+.schedule-menu.show {
+  display: block;
+}
+
+.schedule-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.schedule-option:hover {
+  background: var(--surface-sunken);
+}
+
+.schedule-option:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.schedule-option:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.empty-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.empty-state .muted {
+  max-width: 48ch;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+</style>
+
+<script>
+// Debug form submission
+document.getElementById('generate-form').addEventListener('submit', function(e) {
+  console.log('Form submitted');
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+});
+
+document.querySelectorAll('.schedule-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const id = btn.dataset.ideaId;
+    const menu = document.getElementById(`menu-${id}`);
+    
+    // Close others
+    document.querySelectorAll('.schedule-menu').forEach(m => {
+      if (m !== menu) m.classList.remove('show');
+    });
+    
+    menu.classList.toggle('show');
+  });
+});
+
+document.querySelectorAll('.schedule-option').forEach(opt => {
+  opt.addEventListener('click', async () => {
+    const menu = opt.closest('.schedule-menu');
+    const btn = menu.previousElementSibling;
+    const ideaId = btn.dataset.ideaId;
+    const timeSlot = opt.dataset.time;
+    
+    // Send schedule request
+    const resp = await fetch(`{{ account_path_prefix }}/growth/ideas/${ideaId}/schedule`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({time_slot: timeSlot})
+    });
+    
+    if (resp.ok) {
+      // Reload to show updated status
+      window.location.reload();
+    } else {
+      alert('Failed to schedule');
+    }
+    
+    menu.classList.remove('show');
+  });
+});
+
+// Close menus on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('.schedule-menu').forEach(m => m.classList.remove('show'));
+});
+</script>
 
 {% endblock %}

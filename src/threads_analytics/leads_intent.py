@@ -11,7 +11,7 @@ import logging
 from typing import Literal
 
 from .config import get_settings
-from .llm_client import create_llm_client
+from .llm_client import get_llm_client
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def classify_lead_intent(
             - "reasoning": A brief explanation of the classification
     """
     settings = get_settings()
-    client = create_llm_client()
+    client = get_llm_client()
 
     # Prepare the prompt with the actual values
     bio_text = author_bio if author_bio else "(not provided)"
@@ -115,6 +115,3 @@ def classify_lead_intent(
             "confidence": 0.0,
             "reasoning": f"Error during classification: {exc}",
         }
-
-    finally:
-        client.close()

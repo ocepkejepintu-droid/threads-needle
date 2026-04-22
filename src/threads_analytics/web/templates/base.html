@@ -36,8 +36,11 @@
 
 <div class="app-shell">
 
+  {% set account_prefix = account_path_prefix|default('/accounts/default') %}
+  {% set home_path = account_home_path|default('/accounts/default') %}
+
   <aside class="sidebar">
-    <a href="/" class="sidebar-brand" title="threads-analytics">
+    <a href="{{ home_path }}" class="sidebar-brand" title="threads-analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <path d="M8 12a4 4 0 1 1 4 4"/>
@@ -46,36 +49,28 @@
     </a>
 
     <nav class="sidebar-nav">
-      <a href="/" aria-label="Home">
+      <a href="{{ home_path }}" aria-label="Home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12l9-9 9 9"/>
           <path d="M5 10v10h14V10"/>
         </svg>
         <span class="sidebar-tooltip">Home</span>
       </a>
-      <a href="/experiments" aria-label="Experiments">
+      <a href="{{ account_prefix }}/experiments" aria-label="Experiments">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 2v7L4 20a2 2 0 0 0 1.7 3h12.6A2 2 0 0 0 20 20L14 9V2"/>
           <line x1="9" y1="2" x2="15" y2="2"/>
         </svg>
         <span class="sidebar-tooltip">Experiments</span>
       </a>
-      <a href="/leads" aria-label="Leads">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <circle cx="12" cy="12" r="6"/>
-          <circle cx="12" cy="12" r="2" fill="currentColor"/>
-        </svg>
-        <span class="sidebar-tooltip">Leads</span>
-      </a>
-      <a href="/perception" aria-label="Perception">
+      <a href="{{ account_prefix }}/perception" aria-label="Perception">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>
           <circle cx="12" cy="12" r="3"/>
         </svg>
         <span class="sidebar-tooltip">Perception</span>
       </a>
-      <a href="/algorithm" aria-label="Algorithm">
+      <a href="{{ account_prefix }}/algorithm" aria-label="Algorithm">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="20" x2="4" y2="10"/>
           <line x1="10" y1="20" x2="10" y2="4"/>
@@ -84,31 +79,62 @@
         </svg>
         <span class="sidebar-tooltip">Algorithm</span>
       </a>
-      <a href="/you" aria-label="You">
+      <a href="{{ account_prefix }}/you" aria-label="You">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
         </svg>
         <span class="sidebar-tooltip">You</span>
       </a>
-      <a href="/posts" aria-label="Noteworthy posts">
+      <a href="{{ account_prefix }}/posts" aria-label="Noteworthy posts">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         <span class="sidebar-tooltip">Noteworthy posts</span>
       </a>
-      <a href="/growth/patterns" aria-label="Growth OS">
+      <a href="{{ account_prefix }}/content" aria-label="Content Pipeline">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
         </svg>
-        <span class="sidebar-tooltip">Growth</span>
+        <span class="sidebar-tooltip">Content</span>
       </a>
-      <a href="/compose" aria-label="Brand Composer">
+      <a href="{{ account_prefix }}/performance" aria-label="Performance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="sidebar-tooltip">Performance</span>
+      </a>
+      <a href="{{ account_prefix }}/comments" aria-label="Comments">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+        </svg>
+        <span class="sidebar-tooltip">Comments</span>
+      </a>
+      <a href="{{ account_prefix }}/growth/patterns" aria-label="Growth Patterns">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="sidebar-tooltip">Patterns</span>
+      </a>
+      <a href="{{ account_prefix }}/compose" aria-label="Brand Composer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9"/>
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
         </svg>
         <span class="sidebar-tooltip">Brand Composer</span>
+      </a>
+      <a href="{{ account_prefix }}/calendar" aria-label="Calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span class="sidebar-tooltip">Calendar</span>
       </a>
     </nav>
 
@@ -130,6 +156,12 @@
       </svg>
       <span class="sidebar-tooltip">Re-run</span>
     </button>
+    <button class="sidebar-run" id="run-comments-btn" onclick="triggerRunComments()" aria-label="Run comments" style="margin-top: 0.5rem;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+      </svg>
+      <span class="sidebar-tooltip">Run comments</span>
+    </button>
   </aside>
 
   <main class="main-col">
@@ -140,9 +172,32 @@
         <div class="run-banner-text">
           <strong>Pipeline running…</strong>
           <span id="run-banner-step">starting</span>
+          <div class="run-progress"><div class="run-progress-fill" id="run-progress-fill"></div></div>
         </div>
         <div class="run-banner-timer" id="run-banner-timer">0s</div>
       </div>
+
+      <div id="comments-run-banner" class="run-banner" hidden style="background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3);">
+        <div class="run-spinner" style="border-color: rgba(34, 197, 94, 0.2); border-top-color: var(--pos);"></div>
+        <div class="run-banner-text">
+          <strong>Comments pipeline running…</strong>
+          <span id="comments-run-banner-step">starting</span>
+          <div class="run-progress"><div class="run-progress-fill" id="comments-run-progress-fill"></div></div>
+        </div>
+        <div class="run-banner-timer" id="comments-run-banner-timer">0s</div>
+      </div>
+
+      {% if notifications %}
+      <div class="notifications">
+        {% for note in notifications %}
+        <div class="notification notification-{{ note.alert_type }}">
+          <strong>{{ note.title }}</strong>
+          <span>{{ note.message }}</span>
+          {% if note.link_path %}<a href="{{ note.link_path }}">View</a>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
 
       {% block content %}{% endblock %}
     </div>
@@ -152,15 +207,36 @@
 
 <script>
 (function() {
+  const accountPathPrefix = {{ account_prefix|tojson }};
   const banner = document.getElementById('run-banner');
   const stepEl = document.getElementById('run-banner-step');
   const timerEl = document.getElementById('run-banner-timer');
+  const progressFill = document.getElementById('run-progress-fill');
   const btn = document.getElementById('run-now-btn');
   let pollInterval = null;
   let startedAt = null;
   let wasRunning = false;
 
-  function fmtStep(summary) {
+  const RUN_STAGES = ['ingest','topics','leads','leads_intent','affinity','ground_truth','you_profile','suggestions','public_perception','algorithm_inference','noteworthy','patterns','ideas'];
+
+  function runStageFromProgress(progress) {
+    if (!progress) return null;
+    for (const s of RUN_STAGES) {
+      const st = progress[s];
+      if (st && st.status === 'running') return s;
+    }
+    return null;
+  }
+
+  function runProgressPct(progress) {
+    if (!progress) return 0;
+    const completed = RUN_STAGES.filter(s => progress[s] && progress[s].status === 'complete').length;
+    return Math.round((completed / RUN_STAGES.length) * 100);
+  }
+
+  function fmtStep(summary, progress) {
+    const stage = runStageFromProgress(progress);
+    if (stage) return stage.replace(/_/g, ' ');
     if (!summary) return 'starting';
     if (summary.error) return 'error';
     if (summary.noteworthy_post_ids !== undefined) return 'finishing up';
@@ -183,12 +259,13 @@
     timerEl.textContent = elapsed + 's';
   }
 
-  function showBanner(summary) {
+  function showBanner(summary, progress) {
     if (banner.hidden) {
       banner.hidden = false;
       startedAt = Date.now();
     }
-    stepEl.textContent = fmtStep(summary);
+    stepEl.textContent = fmtStep(summary, progress);
+    if (progressFill) { progressFill.style.width = runProgressPct(progress) + '%'; }
     if (btn) { btn.disabled = true; }
     tickTimer();
   }
@@ -196,15 +273,16 @@
   function hideBanner() {
     banner.hidden = true;
     startedAt = null;
+    if (progressFill) { progressFill.style.width = '0%'; }
     if (btn) { btn.disabled = false; }
   }
 
   function pollStatus() {
-    fetch('/run/status').then(r => r.json()).then(data => {
+    fetch(`${accountPathPrefix}/run/status`).then(r => r.json()).then(data => {
       tickTimer();
       if (data.running) {
         wasRunning = true;
-        showBanner(data.last_summary);
+        showBanner(data.last_summary, data.stage_progress);
       } else {
         if (wasRunning) {
           clearInterval(pollInterval);
@@ -218,11 +296,11 @@
   }
 
   window.triggerRun = function() {
-    fetch('/run', { method: 'POST' }).then(r => r.json()).then(data => {
+    fetch(`${accountPathPrefix}/run`, { method: 'POST' }).then(r => r.json()).then(data => {
       if (data.status === 'already_running') {
-        showBanner(null);
+        showBanner(null, null);
       } else {
-        showBanner({});
+        showBanner({}, null);
       }
       if (!pollInterval) {
         pollInterval = setInterval(pollStatus, 2000);
@@ -230,11 +308,115 @@
     });
   };
 
-  fetch('/run/status').then(r => r.json()).then(data => {
+  fetch(`${accountPathPrefix}/run/status`).then(r => r.json()).then(data => {
     if (data.running) {
       wasRunning = true;
-      showBanner(data.last_summary);
+      showBanner(data.last_summary, data.stage_progress);
       pollInterval = setInterval(pollStatus, 2000);
+    }
+  }).catch(() => {});
+
+  // Comments pipeline runner
+  const commentsBanner = document.getElementById('comments-run-banner');
+  const commentsStepEl = document.getElementById('comments-run-banner-step');
+  const commentsTimerEl = document.getElementById('comments-run-banner-timer');
+  const commentsProgressFill = document.getElementById('comments-run-progress-fill');
+  const commentsBtn = document.getElementById('run-comments-btn');
+  let commentsPollInterval = null;
+  let commentsStartedAt = null;
+  let commentsWasRunning = false;
+
+  const COMMENTS_STAGES = ['comment_inbox_sync','comment_drafts','leads_search','leads_intent'];
+
+  function commentsStageFromProgress(progress) {
+    if (!progress) return null;
+    for (const s of COMMENTS_STAGES) {
+      const st = progress[s];
+      if (st && st.status === 'running') return s;
+    }
+    return null;
+  }
+
+  function commentsProgressPct(progress) {
+    if (!progress) return 0;
+    const completed = COMMENTS_STAGES.filter(s => progress[s] && progress[s].status === 'complete').length;
+    return Math.round((completed / 4) * 100);
+  }
+
+  function fmtCommentsStep(summary, progress) {
+    const stage = commentsStageFromProgress(progress);
+    if (stage === 'comment_inbox_sync') return 'syncing comments';
+    if (stage === 'comment_drafts') return 'drafting replies';
+    if (stage) return stage.replace(/_/g, ' ');
+    if (!summary) return 'starting';
+    if (summary.error) return 'error';
+    if (summary.leads_reply_drafts !== undefined) return 'finishing up';
+    if (summary.leads_scored !== undefined) return 'drafting replies';
+    if (summary.leads_intent_classified !== undefined) return 'scoring leads';
+    if (summary.leads !== undefined) return 'classifying intent';
+    return 'searching leads';
+  }
+
+  function tickCommentsTimer() {
+    if (!commentsStartedAt) return;
+    const elapsed = Math.floor((Date.now() - commentsStartedAt) / 1000);
+    commentsTimerEl.textContent = elapsed + 's';
+  }
+
+  function showCommentsBanner(summary, progress) {
+    if (commentsBanner.hidden) {
+      commentsBanner.hidden = false;
+      commentsStartedAt = Date.now();
+    }
+    commentsStepEl.textContent = fmtCommentsStep(summary, progress);
+    if (commentsProgressFill) { commentsProgressFill.style.width = commentsProgressPct(progress) + '%'; }
+    if (commentsBtn) { commentsBtn.disabled = true; }
+    tickCommentsTimer();
+  }
+
+  function hideCommentsBanner() {
+    commentsBanner.hidden = true;
+    commentsStartedAt = null;
+    if (commentsProgressFill) { commentsProgressFill.style.width = '0%'; }
+    if (commentsBtn) { commentsBtn.disabled = false; }
+  }
+
+  function pollCommentsStatus() {
+    fetch(`${accountPathPrefix}/run/comments/status`).then(r => r.json()).then(data => {
+      tickCommentsTimer();
+      if (data.running) {
+        commentsWasRunning = true;
+        showCommentsBanner(data.last_comments_run_summary, data.stage_progress);
+      } else {
+        if (commentsWasRunning) {
+          clearInterval(commentsPollInterval);
+          commentsPollInterval = null;
+          location.reload();
+          return;
+        }
+        hideCommentsBanner();
+      }
+    }).catch(() => {});
+  }
+
+  window.triggerRunComments = function() {
+    fetch(`${accountPathPrefix}/run/comments`, { method: 'POST' }).then(r => r.json()).then(data => {
+      if (data.status === 'already_running') {
+        showCommentsBanner(null, null);
+      } else {
+        showCommentsBanner({}, null);
+      }
+      if (!commentsPollInterval) {
+        commentsPollInterval = setInterval(pollCommentsStatus, 2000);
+      }
+    });
+  };
+
+  fetch(`${accountPathPrefix}/run/comments/status`).then(r => r.json()).then(data => {
+    if (data.running) {
+      commentsWasRunning = true;
+      showCommentsBanner(data.last_comments_run_summary, data.stage_progress);
+      commentsPollInterval = setInterval(pollCommentsStatus, 2000);
     }
   }).catch(() => {});
 })();

@@ -2,22 +2,179 @@
 {% block content %}
 
 <h1>Growth Performance</h1>
+<p class="muted">A month-over-month and source-based view of how your content is performing.</p>
 
-<section class="performance-section">
-  <h2>This Month vs Last Month</h2>
-  <table class="data-table">
-    <tr><th>Metric</th><th>This Month</th><th>Last Month</th><th>Change</th></tr>
-    <tr><td>Avg Views</td><td>{{ stats.this_month_avg_views|intcomma }}</td><td>{{ stats.last_month_avg_views|intcomma }}</td><td>{{ "+%d"|format(stats.change_pct) if stats.change_pct > 0 else "%d"|format(stats.change_pct) }}%</td></tr>
-  </table>
-</section>
+<div class="page-grid">
+  <section class="span-3 card">
+    <h2>This Month vs Last Month</h2>
+    {% if stats.this_month_avg_views is not none %}
+      <div class="metric-compare">
+        <div class="compare-col">
+          <div class="compare-label">This month</div>
+          <div class="compare-value">{{ stats.this_month_avg_views|intcomma }}</div>
+          <div class="compare-caption">avg views</div>
+        </div>
+        <div class="compare-arrow">→</div>
+        <div class="compare-col">
+          <div class="compare-label">Last month</div>
+          <div class="compare-value">{{ stats.last_month_avg_views|intcomma }}</div>
+          <div class="compare-caption">avg views</div>
+        </div>
+      </div>
+      <div class="change-pill {{ 'pos' if stats.change_pct > 0 else 'neg' if stats.change_pct < 0 else 'flat' }}">
+        {{ "+%d"|format(stats.change_pct) if stats.change_pct > 0 else "%d"|format(stats.change_pct) }}%
+      </div>
+    {% else %}
+      <div class="empty-state compact">
+        <p class="muted">No monthly data yet.</p>
+      </div>
+    {% endif %}
+  </section>
 
-<section class="performance-section">
-  <h2>AI-Generated vs Manual Posts</h2>
-  <table class="data-table">
-    <tr><th>Type</th><th>Avg Views</th><th>Engagement</th></tr>
-    <tr><td>AI-Generated</td><td>{{ stats.ai_avg_views|intcomma }}</td><td>{{ "%.1f"|format(stats.ai_engagement) }}%</td></tr>
-    <tr><td>Manual</td><td>{{ stats.manual_avg_views|intcomma }}</td><td>{{ "%.1f"|format(stats.manual_engagement) }}%</td></tr>
-  </table>
-</section>
+  <section class="span-3 card">
+    <h2>AI-Generated vs Manual</h2>
+    {% if stats.ai_avg_views is not none or stats.manual_avg_views is not none %}
+      <div class="source-grid">
+        <div class="source-block">
+          <div class="source-label">🤖 AI-Generated</div>
+          <div class="source-value">{{ stats.ai_avg_views|intcomma }}</div>
+          <div class="source-caption">avg views · {{ "%.1f"|format(stats.ai_engagement) }}% engagement</div>
+        </div>
+        <div class="source-block">
+          <div class="source-label">✍️ Manual</div>
+          <div class="source-value">{{ stats.manual_avg_views|intcomma }}</div>
+          <div class="source-caption">avg views · {{ "%.1f"|format(stats.manual_engagement) }}% engagement</div>
+        </div>
+      </div>
+    {% else %}
+      <div class="empty-state compact">
+        <p class="muted">No source breakdown yet.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+{% if stats.this_month_avg_views is none and stats.ai_avg_views is none %}
+<div class="empty-state card">
+  <div class="empty-icon">📊</div>
+  <h3>No performance data yet</h3>
+  <p class="muted">Run the pipeline after you have a few weeks of posts ingested to see month-over-month and source-based performance comparisons.</p>
+  <div class="empty-actions">
+    <button class="btn btn-primary" onclick="triggerRun()">Run pipeline now</button>
+    <a href="{{ account_path_prefix }}/posts" class="btn">Browse posts</a>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.metric-compare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0;
+}
+.compare-col {
+  flex: 1;
+  text-align: center;
+}
+.compare-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.compare-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.compare-caption {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.compare-arrow {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+.change-pill {
+  display: inline-flex;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+.change-pill.pos {
+  background: var(--pos-bg);
+  color: var(--pos);
+}
+.change-pill.neg {
+  background: var(--neg-bg);
+  color: var(--neg);
+}
+.change-pill.flat {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.source-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+.source-block {
+  background: var(--surface-sunken);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.source-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.source-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+.source-caption {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.empty-state {
+  text-align: center;
+  padding: 48px 28px;
+}
+.empty-state.compact {
+  padding: 18px 0 8px;
+}
+.empty-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.empty-state .muted {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+</style>
 
 {% endblock %}

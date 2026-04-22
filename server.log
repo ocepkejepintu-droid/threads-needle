@@ -1,8 +1,292 @@
-INFO:     Started server process [94536]
+INFO:     Started server process [28648]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:65055 - "GET /leads/sources HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65057 - "GET /leads/sources/new HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65059 - "GET /growth/patterns HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65061 - "GET /compose HTTP/1.1" 200 OK
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+RSS fetch failed for anthropic (https://www.anthropic.com/rss.xml): Client error '404 Not Found' for url 'https://www.anthropic.com/rss.xml'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+INFO:     127.0.0.1:64181 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64183 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64186 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64269 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64269 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+RSS fetch failed for anthropic (https://www.anthropic.com/rss.xml): Client error '404 Not Found' for url 'https://www.anthropic.com/rss.xml'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+Intake filter LLM call failed: The read operation timed out
+INFO:     127.0.0.1:65101 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /static/style.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65103 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65101 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65105 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65105 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65107 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65109 - "GET /accounts/default/posts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65109 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65111 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65111 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65109 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65111 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/compose HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65113 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65114 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65119 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65119 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65122 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65123 - "POST /accounts/default/api/content/49/dismiss HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65123 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65125 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65123 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65127 - "POST /accounts/default/api/content/50/dismiss HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65127 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65127 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65128 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51798 - "GET /accounts/default HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51798 - "GET /static/animate.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51798 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "POST /accounts/default/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+Threads API error 400: {"error":{"message":"Unsupported get request. Object with ID '18127226413602724' does not exist, cannot be loaded due to missing permissions, or does not support this operation","type":"THApiException","code":100,"error_subcode":33,"fbtrace_id":"Akv0RohJRB0gyE4ja2gH4qo"}}
+insight fetch failed for 18127226413602724: Client error '400 Bad Request' for url 'https://graph.threads.net/v1.0/18127226413602724/insights?metric=views%2Clikes%2Creplies%2Creposts%2Cquotes&access_token=THAANQgZAW1eL5BUVNqVFFaSzlyZAWp5Q3dwY1dpY1FxTV80aXdvWVBkMVl5aFZAiX1NEcmphalhabm1hek9KV3VpbzM3YkNiRXRPTEhmbmpYMFZAYZA1JaeHZANcDc4QWN2WmszeFowYmRFdERVOFZApdUVOYjJMVXBkM2dMb0RHdm8yUEFOWTZANYWFxTlpqMklYckkZD'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+Threads API error 400: {"error":{"message":"Unsupported get request. Object with ID '18225980089215070' does not exist, cannot be loaded due to missing permissions, or does not support this operation","type":"THApiException","code":100,"error_subcode":33,"fbtrace_id":"AVsec6SOJZ5v-vW9h5jYRwn"}}
+insight fetch failed for 18225980089215070: Client error '400 Bad Request' for url 'https://graph.threads.net/v1.0/18225980089215070/insights?metric=views%2Clikes%2Creplies%2Creposts%2Cquotes&access_token=THAANQgZAW1eL5BUVNqVFFaSzlyZAWp5Q3dwY1dpY1FxTV80aXdvWVBkMVl5aFZAiX1NEcmphalhabm1hek9KV3VpbzM3YkNiRXRPTEhmbmpYMFZAYZA1JaeHZANcDc4QWN2WmszeFowYmRFdERVOFZApdUVOYjJMVXBkM2dMb0RHdm8yUEFOWTZANYWFxTlpqMklYckkZD'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+Threads API error 400: {"error":{"message":"Unsupported get request. Object with ID '17982312503198427' does not exist, cannot be loaded due to missing permissions, or does not support this operation","type":"THApiException","code":100,"error_subcode":33,"fbtrace_id":"ACmnpvc5x39naX-Yi2s0ESN"}}
+insight fetch failed for 17982312503198427: Client error '400 Bad Request' for url 'https://graph.threads.net/v1.0/17982312503198427/insights?metric=views%2Clikes%2Creplies%2Creposts%2Cquotes&access_token=THAANQgZAW1eL5BUVNqVFFaSzlyZAWp5Q3dwY1dpY1FxTV80aXdvWVBkMVl5aFZAiX1NEcmphalhabm1hek9KV3VpbzM3YkNiRXRPTEhmbmpYMFZAYZA1JaeHZANcDc4QWN2WmszeFowYmRFdERVOFZApdUVOYjJMVXBkM2dMb0RHdm8yUEFOWTZANYWFxTlpqMklYckkZD'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/experiments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "POST /accounts/default/suggestions/78/run HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:51813 - "GET /accounts/default/experiments/78 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51814 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51814 - "GET /accounts/default/experiments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51814 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/experiments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51832 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/compose HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/calendar HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51843 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51841 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /accounts/default/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52261 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52261 - "GET /accounts/default/growth/patterns HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52261 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52261 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+LLM generation failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402, using patterns
+INFO:     127.0.0.1:52264 - "POST /accounts/default/growth/ideas/generate HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:52264 - "GET /accounts/default/growth/ideas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52264 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52266 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52329 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52329 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52331 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52331 - "POST /accounts/default/api/content/65/move HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52331 - "POST /accounts/default/api/content/65/move HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52332 - "POST /accounts/default/api/content/69/move HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52337 - "GET /accounts/default HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52337 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /accounts/default/compose HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52337 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52337 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52342 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52344 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52347 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52349 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52349 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52349 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+Brand validation LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:52349 - "POST /accounts/default/api/brand-check HTTP/1.1" 200 OK
+RSS fetch failed for anthropic (https://www.anthropic.com/rss.xml): Client error '404 Not Found' for url 'https://www.anthropic.com/rss.xml'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+Intake filter LLM call failed: Client error '402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+INFO:     127.0.0.1:54533 - "GET /accounts/default/content HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54533 - "GET /static/style.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54533 - "GET /static/animate.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54533 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54535 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+Angle-It generation failed for intake 1: 'RawIntakeItem' object has no attribute 'summary'
+INFO:     127.0.0.1:54536 - "POST /accounts/default/api/intake/1/angle-it HTTP/1.1" 500 Internal Server Error
+Angle-It generation failed for intake 1: 'RawIntakeItem' object has no attribute 'summary'
+INFO:     127.0.0.1:54536 - "POST /accounts/default/api/intake/1/angle-it HTTP/1.1" 500 Internal Server Error
+Angle-It generation failed for intake 1: 'RawIntakeItem' object has no attribute 'summary'
+INFO:     127.0.0.1:54537 - "POST /accounts/default/api/intake/1/angle-it HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:55665 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55665 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55667 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55678 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55678 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55679 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55679 - "GET /accounts/default/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55679 - "GET /accounts/default/run/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55678 - "GET /accounts/default/run/comments/status HTTP/1.1" 200 OK

@@ -65,9 +65,10 @@ Produce 4-6 stylistic signatures, exactly 3 postsThatSoundMostLikeYou, exactly 6
 def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
     """Generate and persist the 'You' profile for this run."""
     settings = get_settings()
+    account_id = run.account_id
 
     with session_scope() as session:
-        profile = session.scalar(select(Profile).limit(1))
+        profile = session.scalar(select(Profile).where(Profile.account_id == account_id).limit(1))
         profile_payload = (
             {
                 "username": profile.username,
@@ -78,7 +79,10 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
         )
 
         posts = session.scalars(
-            select(MyPost).order_by(desc(MyPost.created_at)).limit(post_limit)
+            select(MyPost)
+            .where(MyPost.account_id == account_id)
+            .order_by(desc(MyPost.created_at))
+            .limit(post_limit)
         ).all()
         post_payload = [
             {
@@ -91,7 +95,10 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
         ]
 
         replies = session.scalars(
-            select(MyReply).order_by(desc(MyReply.created_at)).limit(15)
+            select(MyReply)
+            .where(MyReply.account_id == account_id)
+            .order_by(desc(MyReply.created_at))
+            .limit(15)
         ).all()
         reply_payload = [{"text": (r.text or "")[:400]} for r in replies]
 
@@ -99,18 +106,14 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
         log.info("no posts to build You profile")
         return None
 
-    text_body = (
-        f"{SCHEMA_INSTRUCTION}\n\n"
-        "DATA:\n"
-        + json.dumps(
-            {
-                "profile": profile_payload,
-                "posts": post_payload,
-                "replies": reply_payload,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
+    text_body = f"{SCHEMA_INSTRUCTION}\n\nDATA:\n" + json.dumps(
+        {
+            "profile": profile_payload,
+            "posts": post_payload,
+            "replies": reply_payload,
+        },
+        ensure_ascii=False,
+        indent=2,
     )
 
     try:
@@ -118,7 +121,7 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
     except ValueError as e:
         log.warning("LLM client not configured: %s", e)
         return None
-    
+
     # Select model based on provider
     if settings.llm_provider == "anthropic":
         model = settings.claude_recommender_model
@@ -126,7 +129,7 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
         model = settings.openrouter_model
     else:
         model = settings.zai_model
-    
+
     try:
         resp = client.create_message(
             model=model,
@@ -146,7 +149,7 @@ def generate_you_profile(run: Run, post_limit: int = 50) -> int | None:
     with session_scope() as session:
         existing = session.get(YouProfile, run.id)
         if existing is None:
-            existing = YouProfile(run_id=run.id)
+            existing = YouProfile(account_id=account_id, run_id=run.id)
             session.add(existing)
         existing.core_identity = data.get("coreIdentity", "")
         existing.distinctive_voice_traits = data.get("distinctiveVoiceTraits") or []

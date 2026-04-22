@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="edit-header">
+  <a href="{{ account_path_prefix }}/growth/ideas" class="back-link">← Back to ideas</a>
+  <h1>Edit Idea</h1>
+</div>
+
+<form method="post" action="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/edit" class="edit-form">
+  <div class="form-group">
+    <label for="concept">Post Content</label>
+    <textarea 
+      name="concept" 
+      id="concept" 
+      rows="8" 
+      maxlength="500"
+      required
+    >{{ idea.concept }}</textarea>
+    <div class="char-count">
+      <span id="char-count">0</span> / 500
+    </div>
+  </div>
+  
+  <div class="form-actions">
+    <a href="{{ account_path_prefix }}/growth/ideas" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+  </div>
+</form>
+
+<style>
+.edit-header {
+  margin-bottom: 24px;
+}
+
+.back-link {
+  display: inline-block;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+.edit-form {
+  max-width: 600px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px rgba(0, 149, 246, 0.15);
+}
+
+.char-count {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.char-count.warning {
+  color: var(--warn);
+}
+
+.char-count.danger {
+  color: var(--neg);
+  font-weight: 600;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+</style>
+
+<script>
+const textarea = document.getElementById('concept');
+const charCount = document.getElementById('char-count');
+const charWrap = document.querySelector('.char-count');
+
+function updateCount() {
+  const len = textarea.value.length;
+  charCount.textContent = len;
+  
+  charWrap.classList.remove('warning', 'danger');
+  if (len > 500) {
+    charWrap.classList.add('danger');
+  } else if (len > 450) {
+    charWrap.classList.add('warning');
+  }
+}
+
+textarea.addEventListener('input', updateCount);
+updateCount();
+</script>
+
+{% endblock %}

@@ -1,7 +1,7 @@
 # Lead Engine v2 Design
 
 **Date:** 2026-04-12  
-**Status:** Approved for implementation  
+**Status:** Approved for implementation (Lead Engine scope; lead score/tier UI is separate from Comments Mission Control)  
 **Scope:** Intent classification + Reply performance analytics
 
 ---

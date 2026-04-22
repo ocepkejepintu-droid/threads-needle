@@ -6,7 +6,7 @@
     {% if e.verdict %}
       <span class="exp-verdict verdict-{{ e.verdict.verdict }}">{{ e.verdict.verdict | upper }}</span>
     {% endif %}
-    <form method="post" action="/experiments/{{ e.id }}/delete" class="exp-delete-form"
+<form method="post" action="{{ account_path_prefix }}/experiments/{{ e.id }}/delete" class="exp-delete-form"
           onsubmit="return confirm('Delete this experiment? This cannot be undone.');">
       <button type="submit" class="exp-delete-btn" aria-label="Delete experiment" title="Delete">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -18,7 +18,7 @@
       </button>
     </form>
   </div>
-  <h3 class="exp-title"><a href="/experiments/{{ e.id }}">{{ e.title }}</a></h3>
+<h3 class="exp-title"><a href="{{ account_path_prefix }}/experiments/{{ e.id }}">{{ e.title }}</a></h3>
   <p class="exp-hypothesis">{{ e.hypothesis }}</p>
   {% if e.status == 'active' %}
     <div class="exp-meta">

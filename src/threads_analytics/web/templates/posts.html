@@ -52,8 +52,48 @@
     {% endfor %}
   </div>
 {% else %}
-  <p class="muted">No noteworthy posts found yet. Run the pipeline to detect outliers and generate commentary.</p>
+  <div class="empty-state card">
+    <div class="empty-icon">🔍</div>
+    <h3>No noteworthy posts found yet</h3>
+    <p class="muted">
+      Run the full pipeline to detect outliers, classify post performance, and generate
+      Claude commentary on what made each post break out or flop.
+    </p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="triggerRun()">Run pipeline now</button>
+      <a href="{{ account_path_prefix }}/posts" class="btn">Browse all posts</a>
+    </div>
+  </div>
 {% endif %}
+
+<style>
+.empty-state {
+  text-align: center;
+  padding: 48px 28px;
+}
+.empty-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.empty-state .muted {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+</style>
 
 <script>
 (function() {
@@ -67,14 +107,12 @@
     cards.forEach((c, i) => {
       c.classList.toggle('nw-hero', i === index);
     });
-    // Move the chosen hero to the top of the grid so the layout reads hero → rest
     const hero = cards[index];
     if (hero && list.firstElementChild !== hero) {
       list.insertBefore(hero, list.firstElementChild);
     }
   }
 
-  // Restore from localStorage (index is stable: it's the server-rendered loop index)
   const saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
   if (!isNaN(saved) && saved >= 0 && saved < cards.length) {
     promote(saved);

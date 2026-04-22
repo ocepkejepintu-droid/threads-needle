@@ -1,11 +1,7 @@
 """Tests for leads module."""
-import pytest
-from datetime import datetime, timezone
 from threads_analytics.leads import (
-    generate_reply_draft,
     should_skip_post,
 )
-from threads_analytics.models import Lead, LeadSource
 
 
 def test_should_skip_own_post():

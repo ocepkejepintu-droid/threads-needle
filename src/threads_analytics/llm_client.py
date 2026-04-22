@@ -6,7 +6,6 @@ Both providers use OpenAI-compatible chat completions API.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -176,6 +175,17 @@ class LLMClient:
         self.client.close()
 
 
+_cached_llm_client: LLMClient | None = None
+
+
 def create_llm_client() -> LLMClient:
     """Factory function to create an LLM client."""
     return LLMClient()
+
+
+def get_llm_client() -> LLMClient:
+    """Return a cached LLM client instance for reuse."""
+    global _cached_llm_client
+    if _cached_llm_client is None:
+        _cached_llm_client = LLMClient()
+    return _cached_llm_client

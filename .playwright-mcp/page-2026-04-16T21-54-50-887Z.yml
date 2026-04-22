@@ -1,0 +1,106 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - link "threads-analytics" [ref=e4] [cursor=pointer]:
+      - /url: /accounts/default
+      - img [ref=e5]
+    - navigation [ref=e9]:
+      - link "Home" [ref=e10] [cursor=pointer]:
+        - /url: /accounts/default
+        - img [ref=e11]
+        - generic: Home
+      - link "Experiments" [ref=e14] [cursor=pointer]:
+        - /url: /accounts/default/experiments
+        - img [ref=e15]
+        - generic: Experiments
+      - link "Perception" [ref=e17] [cursor=pointer]:
+        - /url: /perception
+        - img [ref=e18]
+        - generic: Perception
+      - link "Algorithm" [ref=e21] [cursor=pointer]:
+        - /url: /algorithm
+        - img [ref=e22]
+        - generic: Algorithm
+      - link "You" [ref=e23] [cursor=pointer]:
+        - /url: /accounts/default/you
+        - img [ref=e24]
+        - generic: You
+      - link "Noteworthy posts" [ref=e27] [cursor=pointer]:
+        - /url: /accounts/default/posts
+        - img [ref=e28]
+        - generic: Noteworthy posts
+      - link "Content Pipeline" [ref=e30] [cursor=pointer]:
+        - /url: /accounts/default/content
+        - img [ref=e31]
+        - generic: Content
+      - link "Comments" [ref=e33] [cursor=pointer]:
+        - /url: /accounts/default/comments
+        - img [ref=e34]
+        - generic: Comments
+      - link "Growth Patterns" [ref=e36] [cursor=pointer]:
+        - /url: /accounts/default/growth/patterns
+        - img [ref=e37]
+        - generic: Patterns
+      - link "Brand Composer" [ref=e38] [cursor=pointer]:
+        - /url: /compose
+        - img [ref=e39]
+        - generic: Brand Composer
+      - link "Calendar" [ref=e41] [cursor=pointer]:
+        - /url: /accounts/default/calendar
+        - img [ref=e42]
+        - generic: Calendar
+    - button "Toggle dark mode" [ref=e44] [cursor=pointer]:
+      - img [ref=e45]
+      - generic: Theme
+    - button "Re-run" [ref=e48] [cursor=pointer]:
+      - img [ref=e49]
+      - generic: Re-run
+    - button "Run comments" [ref=e52] [cursor=pointer]:
+      - img [ref=e53]
+      - generic: Run comments
+  - main [ref=e55]:
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - heading "Comments Mission Control" [level=1] [ref=e59]
+        - button "Sync comments" [ref=e61] [cursor=pointer]
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - text: Drafted
+          - generic [ref=e64]: "0"
+        - generic [ref=e65]:
+          - text: Approved
+          - generic [ref=e66]: "0"
+        - generic [ref=e67]:
+          - text: Sent
+          - generic [ref=e68]: "0"
+        - generic [ref=e69]:
+          - text: Failed
+          - generic [ref=e70]: "0"
+        - generic [ref=e71]:
+          - text: Ignored
+          - generic [ref=e72]: "0"
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - generic [ref=e76]: 📝 Drafted
+            - generic [ref=e77]: "0"
+          - generic [ref=e79]: No items
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: ✅ Approved
+            - generic [ref=e83]: "0"
+          - generic [ref=e85]: No items
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - generic [ref=e88]: 📤 Sent
+            - generic [ref=e89]: "0"
+          - generic [ref=e91]: No items
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]: ❌ Failed
+            - generic [ref=e95]: "0"
+          - generic [ref=e97]: No items
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - generic [ref=e100]: 🔕 Ignored
+            - generic [ref=e101]: "0"
+          - generic [ref=e103]: No items

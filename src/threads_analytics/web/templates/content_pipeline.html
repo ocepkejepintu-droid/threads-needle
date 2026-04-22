@@ -1,0 +1,2111 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="content-pipeline-wrapper">
+  <div class="page-header">
+    <h1>Content Pipeline</h1>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="openExperimentGenerateModal()">🧪 Generate from Experiments</button>
+      <button class="btn btn-primary" onclick="openGenerateModal()">✨ Generate Ideas</button>
+    </div>
+  </div>
+
+<style>
+.pipeline-container {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 1600px) {
+  .pipeline-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .pipeline-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .pipeline-container {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pipeline-column {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 160px);
+  min-width: 0;
+}
+
+.column-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.column-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.column-count {
+  background: var(--surface-sunken);
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.column-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.column-cards.drag-over {
+  background: var(--surface-sunken);
+}
+
+.column-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+}
+
+.idea-card {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.idea-card:hover {
+  border-color: var(--link);
+  transform: translateY(-2px);
+}
+
+.idea-card.dragging {
+  opacity: 0.5;
+}
+
+.idea-card.editing {
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link-alpha, rgba(0, 149, 246, 0.3));
+}
+
+.idea-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.375rem;
+}
+
+.idea-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.idea-score {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.score-high { background: var(--pos-bg); color: var(--pos); }
+.score-medium { background: var(--warn-bg); color: var(--warn); }
+.score-low { background: var(--neg-bg); color: var(--neg); }
+
+.idea-content {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+  white-space: pre-wrap;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.idea-content.editable {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  outline: none;
+  max-height: none;
+  min-height: 80px;
+  color: var(--text);
+}
+
+.idea-image {
+  margin-bottom: 0.75rem;
+}
+
+.idea-image img {
+  width: 100%;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.idea-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.idea-actions {
+  display: flex;
+  gap: 0.125rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.125rem 0.25rem;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background: var(--link);
+  border-color: var(--link);
+  color: white;
+}
+
+.action-btn.primary {
+  background: var(--link);
+  border-color: var(--link);
+  color: white;
+}
+
+.action-btn.danger:hover {
+  background: var(--neg);
+  border-color: var(--neg);
+}
+
+.scheduled-time {
+  font-size: 0.6875rem;
+  color: var(--link);
+  margin-top: 0.375rem;
+}
+
+.thread-link {
+  color: var(--pos);
+  text-decoration: none;
+}
+
+.thread-link:hover {
+  text-decoration: underline;
+}
+
+/* Character counter */
+.char-counter {
+  font-size: 0.75rem;
+  text-align: right;
+  margin-top: 0.25rem;
+}
+
+.char-counter.warning { color: var(--warn); }
+.char-counter.danger { color: var(--neg); font-weight: 600; }
+.char-counter.ok { color: var(--pos); }
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--text-muted);
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.625rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--link);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  animation: slideIn 0.3s ease;
+}
+
+.toast.success { border-color: var(--pos); color: var(--pos); }
+.toast.error { border-color: var(--neg); color: var(--neg); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Edit modal */
+.edit-modal .form-group textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.image-preview {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+.local-image-warning {
+  font-size: 0.6875rem;
+  color: var(--warn);
+  background: var(--warn-bg);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.375rem;
+  text-align: center;
+}
+
+.idea-card.file-drag-over {
+  border-color: var(--pos);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.idea-card.file-drag-over::after {
+  content: "Drop image here";
+  position: absolute;
+  inset: 0;
+  background: rgba(34, 197, 94, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--pos);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.idea-card {
+  position: relative;
+}
+
+/* Experiment card selection */
+.experiment-card {
+  background: var(--surface-sunken);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.experiment-card:hover {
+  border-color: var(--link);
+  background: var(--surface);
+}
+
+.experiment-card.selected {
+  border-color: var(--link);
+  background: rgba(0, 149, 246, 0.1);
+}
+
+.experiment-card.selected .experiment-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.experiment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.experiment-category {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--link);
+  background: rgba(0, 149, 246, 0.15);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.experiment-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--link);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s ease;
+}
+
+.experiment-title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  line-height: 1.4;
+}
+
+.experiment-hypothesis {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Full-width override for content pipeline */
+.main-col .main-inner {
+  max-width: none !important;
+  width: 100%;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+}
+
+.content-pipeline-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.page-header {
+  padding: 0 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.page-header h1 {
+  font-size: 1.25rem;
+}
+.intake-card {
+  border-left: 3px solid var(--link);
+}
+
+.intake-meta {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.intake-source {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.intake-mechanic {
+  font-size: 0.625rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.0625rem 0.25rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.modal-wide {
+  max-width: 720px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.variant-card {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.variant-card:hover {
+  border-color: var(--link);
+  background: rgba(0, 149, 246, 0.04);
+}
+
+.variant-card.selected {
+  border-color: var(--link);
+  background: rgba(0, 149, 246, 0.08);
+  box-shadow: 0 0 0 2px var(--link-alpha, rgba(0, 149, 246, 0.3));
+}
+
+.variant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.variant-mechanic {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--link);
+}
+
+.variant-score {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.variant-hook {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.375rem;
+}
+
+.variant-body {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin-bottom: 0.5rem;
+}
+
+.variant-reasoning {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.variant-rubric {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.variant-rubric span {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.0625rem 0.375rem;
+}
+
+.rubric-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.rubric-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 36px;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rubric-row label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.rubric-max {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  margin-left: 0.25rem;
+}
+
+.rubric-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--link);
+}
+
+.rubric-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--text);
+}
+
+.rubric-mechanic-row {
+  margin-bottom: 1rem;
+}
+
+.rubric-mechanic-row label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--text-muted);
+}
+
+.rubric-mechanic-row select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.rubric-summary {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.rubric-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rubric-tier {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rubric-tier.tier-hero { color: var(--pos); }
+.rubric-tier.tier-engine { color: var(--link); }
+.rubric-tier.tier-signal { color: var(--warn); }
+.rubric-tier.tier-kill { color: var(--neg); }
+
+.rubric-warning {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--neg);
+  font-weight: 500;
+}
+
+.outcome-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.outcome-breakout {
+  background: var(--pos-bg);
+  color: var(--pos);
+}
+
+.outcome-healthy {
+  background: rgba(0, 149, 246, 0.12);
+  color: var(--link);
+}
+
+.outcome-stall {
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.outcome-zero_reply {
+  background: var(--neg-bg);
+  color: var(--neg);
+}
+</style>
+
+<div class="pipeline-container">
+  <!-- Intake Column -->
+  <div class="pipeline-column" data-status="intake">
+    <div class="column-header">
+      <span class="column-title">📥 Intake</span>
+      <span class="column-count" id="intake-count">{{ intake_items|length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for item in intake_items %}
+      <div class="idea-card intake-card" data-id="{{ item.id }}">
+        <div class="idea-header">
+          <span class="idea-title">{{ item.source_title }}</span>
+          <span class="idea-score score-{% if item.operator_standing_score and item.operator_standing_score >= 80 %}high{% elif item.operator_standing_score and item.operator_standing_score >= 50 %}medium{% else %}low{% endif %}">
+            {{ item.operator_standing_score or '—' }}
+          </span>
+        </div>
+        <div class="intake-meta">
+          <span class="intake-source">{{ {'hn':'🔥 HN','anthropic':'🅰️ Anthropic','openai':'🅾️ OpenAI','gemini':'♊ Gemini','manual':'✋ Manual'}[item.source] or item.source }}</span>
+          {% if item.candidate_mechanics %}
+            {% for m in item.candidate_mechanics %}
+            <span class="intake-mechanic">{{ m.replace('_', ' ') }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+        <div class="idea-content">{{ item.summary or item.source_title }}</div>
+        <div class="idea-meta">
+          <span>{{ item.discovered_at.strftime('%b %d %H:%M') if item.discovered_at else '' }}</span>
+          <div class="idea-actions">
+            <a class="action-btn" href="{{ item.source_url }}" target="_blank" title="View source">🔗</a>
+            <button class="action-btn primary" onclick="convertIntake({{ item.id }})" title="Convert to Draft">✨ Draft</button>
+            <button class="action-btn danger" onclick="archiveIntake({{ item.id }})" title="Archive">🗑️</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not intake_items %}
+      <div class="column-empty">No intake items yet. Run the daily fetch or check back tomorrow.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Draft Column -->
+  <div class="pipeline-column" data-status="draft">
+    <div class="column-header">
+      <span class="column-title">📝 Draft</span>
+      <span class="column-count" id="draft-count">{{ drafts|length }}</span>
+    </div>
+    <div class="column-cards" ondrop="drop(event, 'draft')" ondragover="allowDrop(event)">
+      {% for idea in drafts %}
+      <div class="idea-card" draggable="true" data-id="{{ idea.id }}" ondragstart="drag(event)" id="idea-{{ idea.id }}" ondragenter="handleCardDragEnter(event)" ondragleave="handleCardDragLeave(event)" ondragover="handleCardDragOver(event)" ondrop="handleCardDrop(event, {{ idea.id }})">
+        <div class="idea-header">
+          <span class="idea-title">{{ idea.title }}</span>
+          <span class="idea-score score-{% if idea.predicted_score >= 80 %}high{% elif idea.predicted_score >= 60 %}medium{% else %}low{% endif %}">{{ idea.predicted_score or 0 }}</span>
+        </div>
+        <div class="idea-content" id="content-{{ idea.id }}" ondblclick="startEdit({{ idea.id }})">{{ idea.concept or '(no content)' }}</div>
+        {% if idea.image_url %}
+        <div class="idea-image">
+          <img src="{{ idea.image_url }}" alt="Post image" loading="lazy">
+          {% if 'localhost' in (idea.image_url or '') or '127.0.0.1' in (idea.image_url or '') %}
+          <div class="local-image-warning">⚠️ Local image — can't publish to Threads</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="idea-meta">
+          <span>{{ idea.created_at.strftime('%b %d') }}</span>
+          <div class="idea-actions">
+            <button class="action-btn" onclick="startEdit({{ idea.id }})" title="Edit">✏️</button>
+            <button class="action-btn primary" onclick="openRubricModal({{ idea.id }})" title="Promote to Queue">⚡</button>
+            <button class="action-btn" onclick="openImageModal({{ idea.id }})" title="Add image">🖼️</button>
+            <button class="action-btn danger" onclick="dismissIdea({{ idea.id }})" title="Dismiss">🗑️</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not drafts %}
+      <div class="column-empty">No drafts yet. Generate ideas or drag them here.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Experiments Column -->
+  <div class="pipeline-column" data-status="draft">
+    <div class="column-header">
+      <span class="column-title">🧪 Experiments</span>
+      <span class="column-count" id="experiment-count">{{ experiment_drafts|length }}</span>
+    </div>
+    <div class="column-cards" ondrop="drop(event, 'draft')" ondragover="allowDrop(event)">
+      {% for idea in experiment_drafts %}
+      <div class="idea-card" draggable="true" data-id="{{ idea.id }}" ondragstart="drag(event)" id="idea-{{ idea.id }}" style="border-color: var(--link); background: rgba(0, 149, 246, 0.05);" ondragenter="handleCardDragEnter(event)" ondragleave="handleCardDragLeave(event)" ondragover="handleCardDragOver(event)" ondrop="handleCardDrop(event, {{ idea.id }})">
+        <div class="idea-header">
+          <span class="idea-title">{{ idea.title }}</span>
+          <span class="idea-score score-{% if idea.predicted_score >= 80 %}high{% elif idea.predicted_score >= 60 %}medium{% else %}low{% endif %}">{{ idea.predicted_score or 0 }}</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--link); margin-bottom: 0.5rem;">🧪 {{ idea.experiment.title[:40] }}{% if idea.experiment.title|length > 40 %}...{% endif %}</div>
+        <div class="idea-content" id="content-{{ idea.id }}" ondblclick="startEdit({{ idea.id }})">{{ idea.concept or '(no content)' }}</div>
+        {% if idea.image_url %}
+        <div class="idea-image">
+          <img src="{{ idea.image_url }}" alt="Post image" loading="lazy">
+          {% if 'localhost' in (idea.image_url or '') or '127.0.0.1' in (idea.image_url or '') %}
+          <div class="local-image-warning">⚠️ Local image — can't publish to Threads</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="idea-meta">
+          <span>{{ idea.created_at.strftime('%b %d') }}</span>
+          <div class="idea-actions">
+            <button class="action-btn" onclick="startEdit({{ idea.id }})" title="Edit">✏️</button>
+            <button class="action-btn primary" onclick="openRubricModal({{ idea.id }})" title="Promote to Queue">⚡</button>
+            <button class="action-btn" onclick="openImageModal({{ idea.id }})" title="Add image">🖼️</button>
+            <button class="action-btn danger" onclick="dismissIdea({{ idea.id }})" title="Dismiss">🗑️</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not experiment_drafts %}
+      <div class="column-empty">No experiment-linked drafts.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Approved/Queue Column -->
+  <div class="pipeline-column" data-status="approved">
+    <div class="column-header">
+      <span class="column-title">⚡ Queue</span>
+      <span class="column-count" id="approved-count">{{ approved|length }}</span>
+    </div>
+    <div class="column-cards" ondrop="drop(event, 'approved')" ondragover="allowDrop(event)">
+      {% for idea in approved %}
+      <div class="idea-card" draggable="true" data-id="{{ idea.id }}" ondragstart="drag(event)" id="idea-{{ idea.id }}">
+        <div class="idea-header">
+          <span class="idea-title">{{ idea.title }}</span>
+          <span class="idea-score score-{% if idea.predicted_score >= 80 %}high{% elif idea.predicted_score >= 60 %}medium{% else %}low{% endif %}">{{ idea.predicted_score or 0 }}</span>
+        </div>
+        {% if idea.experiment %}
+        <div style="font-size: 0.75rem; color: var(--link); margin-bottom: 0.5rem;">🧪 {{ idea.experiment.title[:40] }}{% if idea.experiment.title|length > 40 %}...{% endif %}</div>
+        {% endif %}
+        <div class="idea-content" id="content-{{ idea.id }}">{{ idea.concept or '(no content)' }}</div>
+        {% if idea.image_url %}
+        <div class="idea-image">
+          <img src="{{ idea.image_url }}" alt="Post image" loading="lazy">
+          {% if 'localhost' in (idea.image_url or '') or '127.0.0.1' in (idea.image_url or '') %}
+          <div class="local-image-warning">⚠️ Local image — can't publish to Threads</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="idea-meta">
+          <span>Queued</span>
+          <div class="idea-actions">
+            <button class="action-btn" onclick="startEdit({{ idea.id }})" title="Edit">✏️</button>
+            <button class="action-btn primary" onclick="openScheduleModal({{ idea.id }}, '{{ idea.tier or '' }}')">📅 Schedule</button>
+            <button class="action-btn" onclick="openImageModal({{ idea.id }})" title="Add image">🖼️</button>
+            <button class="action-btn" onclick="moveIdea({{ idea.id }}, 'draft')">↩️ Draft</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not approved %}
+      <div class="column-empty">Drag drafts here to queue them for scheduling.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Scheduled Column -->
+  <div class="pipeline-column" data-status="scheduled">
+    <div class="column-header">
+      <span class="column-title">📅 Scheduled</span>
+      <span class="column-count" id="scheduled-count">{{ scheduled|length }}</span>
+    </div>
+    <div class="column-cards" ondrop="drop(event, 'scheduled')" ondragover="allowDrop(event)">
+      {% for idea in scheduled %}
+      <div class="idea-card" draggable="true" data-id="{{ idea.id }}" ondragstart="drag(event)" id="idea-{{ idea.id }}" ondragenter="handleCardDragEnter(event)" ondragleave="handleCardDragLeave(event)" ondragover="handleCardDragOver(event)" ondrop="handleCardDrop(event, {{ idea.id }})">
+        <div class="idea-header">
+          <span class="idea-title">{{ idea.title }}</span>
+          <span class="idea-score score-{% if idea.predicted_score >= 80 %}high{% elif idea.predicted_score >= 60 %}medium{% else %}low{% endif %}">{{ idea.predicted_score or 0 }}</span>
+        </div>
+        {% if idea.experiment %}
+        <div style="font-size: 0.75rem; color: var(--link); margin-bottom: 0.5rem;">🧪 {{ idea.experiment.title[:40] }}{% if idea.experiment.title|length > 40 %}...{% endif %}</div>
+        {% endif %}
+        <div class="idea-content" id="content-{{ idea.id }}">{{ idea.concept or '(no content)' }}</div>
+        {% if idea.image_url %}
+        <div class="idea-image">
+          <img src="{{ idea.image_url }}" alt="Post image" loading="lazy">
+          {% if 'localhost' in (idea.image_url or '') or '127.0.0.1' in (idea.image_url or '') %}
+          <div class="local-image-warning">⚠️ Local image — can't publish to Threads</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="scheduled-time">🕐 {{ idea.scheduled_at.astimezone(schedule_tz).strftime('%a, %b %d @ %H:%M') if idea.scheduled_at else '' }}</div>
+        <div class="idea-meta" style="margin-top: 0.5rem;">
+          <span>Auto-publish</span>
+          <div class="idea-actions">
+            <button class="action-btn" onclick="startEdit({{ idea.id }})" title="Edit">✏️</button>
+            <button class="action-btn" onclick="openImageModal({{ idea.id }})" title="Add image">🖼️</button>
+            <button class="action-btn primary" onclick="publishNow({{ idea.id }})" title="Publish now">🚀 Publish</button>
+            <button class="action-btn" onclick="unscheduleIdea({{ idea.id }})">↩️ Unschedule</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not scheduled %}
+      <div class="column-empty">No scheduled posts. Drag queued items here or use the Calendar.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Published Column -->
+  <div class="pipeline-column" data-status="published">
+    <div class="column-header">
+      <span class="column-title">✅ Published</span>
+      <span class="column-count">{{ published|length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for idea in published %}
+      <div class="idea-card">
+        <div class="idea-header">
+          <span class="idea-title">{{ idea.title }}</span>
+          <span class="idea-score score-high">✓</span>
+        </div>
+        {% if idea.experiment %}
+        <div style="font-size: 0.75rem; color: var(--link); margin-bottom: 0.5rem;">🧪 {{ idea.experiment.title[:40] }}{% if idea.experiment.title|length > 40 %}...{% endif %}</div>
+        {% endif %}
+        <div class="idea-content">{{ idea.concept or '(no content)' }}</div>
+        {% if idea.image_url %}
+        <div class="idea-image">
+          <img src="{{ idea.image_url }}" alt="Post image" loading="lazy">
+          {% if 'localhost' in (idea.image_url or '') or '127.0.0.1' in (idea.image_url or '') %}
+          <div class="local-image-warning">⚠️ Local image — can't publish to Threads</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if idea.thread_id %}
+        <div class="scheduled-time">
+          <a href="https://threads.net/t/{{ idea.thread_id }}" target="_blank" class="thread-link">🔗 View on Threads</a>
+        </div>
+        {% endif %}
+        <div class="idea-meta" style="margin-top: 0.5rem;">
+          <span>{{ idea.posted_at.strftime('%b %d') if idea.posted_at else 'Published' }}</span>
+          {% if idea.thread_id and outcome_map.get(idea.thread_id) %}
+          <span class="outcome-badge outcome-{{ outcome_map[idea.thread_id] }}">{{ outcome_map[idea.thread_id].replace('_', ' ') }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if not published %}
+      <div class="column-empty">No published posts yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Generate Modal -->
+<div class="modal-overlay" id="generateModal" onclick="closeGenerateModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Generate New Ideas</h3>
+      <button class="modal-close" onclick="closeGenerateModal()">×</button>
+    </div>
+    <form action="{{ account_path_prefix }}/growth/ideas/generate" method="POST">
+      <div class="form-group">
+        <label>Topic</label>
+        <input type="text" name="topic" placeholder="e.g., 'remote hiring', 'team building'" value="hiring and remote work">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeGenerateModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Generate 3 Ideas</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Experiment Generate Modal -->
+<div class="modal-overlay" id="experimentGenerateModal" onclick="closeExperimentGenerateModal(event)">
+  <div class="modal experiment-modal" onclick="event.stopPropagation()" style="max-width: 700px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">🧪 Generate from Active Experiments</h3>
+        <small style="color: var(--text-muted);">Select an experiment to generate content ideas that will be auto-tracked</small>
+      </div>
+      <button class="modal-close" onclick="closeExperimentGenerateModal()">×</button>
+    </div>
+    
+    <form action="{{ account_path_prefix }}/content/generate-from-experiments" method="POST" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+      <input type="hidden" name="experiment_id" id="selectedExperimentId" required>
+      
+      <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem; margin: 1rem 0;">
+        <div id="experimentsList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading active experiments...</div>
+        </div>
+      </div>
+      
+      <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: inline; margin-right: 0.5rem;">Generate</label>
+            <input type="number" name="count" value="3" min="1" max="10" style="width: 60px; padding: 0.375rem; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+            <label style="display: inline; margin-left: 0.5rem;">ideas</label>
+          </div>
+          <div class="modal-actions" style="padding: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeExperimentGenerateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="generateExperimentBtn" disabled>Generate & Track</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Schedule Modal -->
+<div class="modal-overlay" id="scheduleModal" onclick="closeScheduleModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">📅 Schedule Post</h3>
+      <button class="modal-close" onclick="closeScheduleModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label>Allowed Slots <span id="scheduleTierLabel" style="font-weight: 600; color: var(--link);"></span></label>
+      <div id="scheduleSlotButtons" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <!-- Populated by JS based on tier -->
+      </div>
+      <small id="scheduleSlotHint" style="color: var(--text-muted); display: block; margin-top: 4px;"></small>
+    </div>
+    <div class="form-group">
+      <label>Custom Time (Jakarta WIB, UTC+7)</label>
+      <input type="datetime-local" id="scheduleCustomTime" style="width: 100%; padding: 0.625rem; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.875rem;">
+      <small style="color: var(--text-muted); display: block; margin-top: 4px;">All times are in Jakarta timezone</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeScheduleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSchedule()">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal" onclick="closeEditModal(event)">
+  <div class="modal edit-modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Post</h3>
+      <button class="modal-close" onclick="closeEditModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label>Content <span class="char-counter" id="editCharCount">0/280</span></label>
+      <textarea id="editContent" oninput="updateEditCharCount()"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Upload Image (optional)</label>
+      <input type="file" id="editImageFile" accept="image/*" onchange="updateEditImagePreview()">
+      <img id="editImagePreview" class="image-preview" style="display: none;">
+      <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem; cursor: pointer;">
+        <input type="checkbox" id="editImageUploadExternal" checked>
+        <span>☁️ Upload to 0x0.st for public URL (recommended)</span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Or Image URL (optional)</label>
+      <input type="text" id="editImageUrl" placeholder="https://example.com/image.jpg" oninput="updateImagePreview()">
+      <img id="imagePreview" class="image-preview" style="display: none;">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rubric Modal -->
+<div class="modal-overlay" id="rubricModal" onclick="closeRubricModal(event)">
+  <div class="modal modal-wide" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">📊 Score This Draft</h3>
+      <button class="modal-close" onclick="closeRubricModal()">×</button>
+    </div>
+    <div id="rubricForm">
+      <div class="rubric-sliders">
+        <div class="rubric-row">
+          <label>Hook Test <span class="rubric-max">/20</span></label>
+          <input type="range" id="rubricHook" min="0" max="20" value="10" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricHookVal">10</span>
+        </div>
+        <div class="rubric-row">
+          <label>Mechanic Fit <span class="rubric-max">/20</span></label>
+          <input type="range" id="rubricMechanic" min="0" max="20" value="10" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricMechanicVal">10</span>
+        </div>
+        <div class="rubric-row">
+          <label>Operator Standing <span class="rubric-max">/20</span></label>
+          <input type="range" id="rubricStanding" min="0" max="20" value="10" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricStandingVal">10</span>
+        </div>
+        <div class="rubric-row">
+          <label>Trend Freshness <span class="rubric-max">/15</span></label>
+          <input type="range" id="rubricFreshness" min="0" max="15" value="7" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricFreshnessVal">7</span>
+        </div>
+        <div class="rubric-row">
+          <label>Reply Invitation <span class="rubric-max">/15</span></label>
+          <input type="range" id="rubricReply" min="0" max="15" value="7" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricReplyVal">7</span>
+        </div>
+        <div class="rubric-row">
+          <label>Voice Signature <span class="rubric-max">/10</span></label>
+          <input type="range" id="rubricVoice" min="0" max="10" value="5" oninput="updateRubricTotal()">
+          <span class="rubric-value" id="rubricVoiceVal">5</span>
+        </div>
+      </div>
+      <div class="rubric-mechanic-row">
+        <label>Mechanic</label>
+        <select id="rubricMechanicSelect">
+          <option value="">— Select —</option>
+          <option value="binary_verdict">Binary Verdict</option>
+          <option value="community_ask">Community Ask</option>
+          <option value="teaser_drop">Teaser Drop</option>
+          <option value="structured_finding">Structured Finding</option>
+          <option value="mid_experiment">Mid-Experiment Drop</option>
+          <option value="token_receipt">Token Receipt</option>
+          <option value="signal">Signal / Human</option>
+        </select>
+      </div>
+      <div class="rubric-summary">
+        <div class="rubric-total">Total: <span id="rubricTotal">49</span> / 100</div>
+        <div class="rubric-tier" id="rubricTier">Tier: —</div>
+        <div class="rubric-warning" id="rubricWarning" style="display: none;">⚠️ Below quality floor (50). Consider archiving instead.</div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeRubricModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="rubricSubmitBtn" onclick="saveRubricAndPromote()">⚡ Promote to Queue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal-overlay" id="imageModal" onclick="closeImageModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Add Image</h3>
+      <button class="modal-close" onclick="closeImageModal()">×</button>
+    </div>
+    
+    <!-- File Upload Tab -->
+    <div class="form-group">
+      <label>Upload from computer</label>
+      <input type="file" id="imageFileInput" accept="image/*" onchange="previewFileUpload()">
+      <img id="fileUploadPreview" class="image-preview" style="display: none;">
+      <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem; cursor: pointer;">
+        <input type="checkbox" id="imageUploadExternal" checked>
+        <span>☁️ Upload to 0x0.st for public URL (recommended)</span>
+      </label>
+      <small id="imageUploadExternalHint" style="color: var(--text-muted); display: block; margin-top: 0.25rem;">No API key needed</small>
+    </div>
+    
+    <div style="text-align: center; color: var(--text-muted); margin: 1rem 0;">— or —</div>
+    
+    <!-- URL Tab -->
+    <div class="form-group">
+      <label>Image URL</label>
+      <input type="text" id="imageUrlInput" placeholder="https://example.com/image.jpg" oninput="updateImageModalPreview()">
+      <img id="imageModalPreview" class="image-preview" style="display: none;">
+    </div>
+    
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeImageModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveImage()">Add Image</button>
+    </div>
+  </div>
+</div>
+
+<!-- Angle-It Modal -->
+<div class="modal-overlay" id="angleItModal" onclick="closeAngleItModal(event)">
+  <div class="modal modal-wide" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">✨ Angle-It</span>
+      <button class="modal-close" onclick="closeAngleItModal()">&times;</button>
+    </div>
+    <div id="angleItLoading" style="text-align: center; padding: 2rem;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⏳</div>
+      <div style="color: var(--text-muted);">Claude is drafting 3 angles...</div>
+      <div style="font-size: 0.75rem; color: var(--text-faint); margin-top: 0.5rem;">Takes 3–8 seconds</div>
+    </div>
+    <div id="angleItContent" style="display: none;">
+      <div id="angleItVariants"></div>
+      <div id="angleItEditSection" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+        <div class="form-group">
+          <label>Edit draft body</label>
+          <textarea id="angleItEditBody" rows="4" style="width: 100%; font-family: inherit; font-size: 0.875rem;"></textarea>
+          <div class="char-counter" id="angleItCharCounter">0 chars</div>
+        </div>
+        <div class="form-group">
+          <label>Mechanic</label>
+          <select id="angleItEditMechanic" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text);">
+            <option value="binary_verdict">Binary Verdict</option>
+            <option value="community_ask">Community Ask</option>
+            <option value="teaser_drop">Teaser Drop</option>
+            <option value="structured_finding">Structured Finding</option>
+            <option value="mid_experiment">Mid-Experiment Drop</option>
+            <option value="token_receipt">Token Receipt</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button class="btn btn-secondary" onclick="cancelAngleItEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmAngleItConversion()">✨ Convert to Draft</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// Drag and Drop
+let draggedId = null;
+let currentScheduleId = null;
+let currentEditId = null;
+let currentImageId = null;
+
+function drag(ev) {
+  draggedId = ev.target.dataset.id;
+  ev.target.classList.add('dragging');
+  ev.dataTransfer.effectAllowed = 'move';
+}
+
+document.addEventListener('dragend', (e) => {
+  if (e.target.classList.contains('idea-card')) {
+    e.target.classList.remove('dragging');
+  }
+});
+
+function allowDrop(ev) {
+  ev.preventDefault();
+  const column = ev.target.closest('.column-cards');
+  if (column) column.classList.add('drag-over');
+}
+
+document.addEventListener('dragleave', (e) => {
+  if (e.target.classList.contains('column-cards')) {
+    e.target.classList.remove('drag-over');
+  }
+});
+
+function drop(ev, status) {
+  ev.preventDefault();
+  const column = ev.target.closest('.column-cards');
+  if (column) column.classList.remove('drag-over');
+  if (draggedId) moveIdea(draggedId, status);
+}
+
+// Card-level file drag & drop for image upload
+function handleCardDragEnter(ev) {
+  if (ev.dataTransfer.types.includes('Files')) {
+    ev.currentTarget.classList.add('file-drag-over');
+  }
+}
+
+function handleCardDragLeave(ev) {
+  ev.currentTarget.classList.remove('file-drag-over');
+}
+
+function handleCardDragOver(ev) {
+  if (ev.dataTransfer.types.includes('Files')) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.dataTransfer.dropEffect = 'copy';
+  }
+}
+
+function handleCardDrop(ev, ideaId) {
+  ev.stopPropagation();
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('file-drag-over');
+  
+  const files = ev.dataTransfer.files;
+  if (files && files.length > 0) {
+    const file = files[0];
+    if (file.type.startsWith('image/')) {
+      uploadImageExternal(ideaId, file);
+    } else {
+      showToast('Only image files are supported', 'error');
+    }
+  }
+}
+
+async function uploadImageExternal(ideaId, file) {
+  showToast('Uploading to 0x0.st...', 'success');
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${ideaId}/upload-image-external`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      showToast('Image uploaded to 0x0.st!', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to upload', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+// Actions
+async function moveIdea(id, status) {
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${id}/move`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status})
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Moved successfully', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to move', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+async function archiveIntake(id) {
+  if (!confirm('Archive this intake item?')) return;
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/intake/${id}/archive`, {method: 'POST'});
+    const data = await response.json();
+    if (data.success) {
+      showToast('Archived', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to archive', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+// Rubric Modal
+let _rubricIdeaId = null;
+
+function openRubricModal(id) {
+  _rubricIdeaId = id;
+  // Reset to defaults
+  document.getElementById('rubricHook').value = 10;
+  document.getElementById('rubricMechanic').value = 10;
+  document.getElementById('rubricStanding').value = 10;
+  document.getElementById('rubricFreshness').value = 7;
+  document.getElementById('rubricReply').value = 7;
+  document.getElementById('rubricVoice').value = 5;
+  document.getElementById('rubricMechanicSelect').value = '';
+  updateRubricTotal();
+  document.getElementById('rubricModal').classList.add('active');
+}
+
+function closeRubricModal(e) {
+  if (e && e.target !== e.currentTarget && e.target.id !== 'rubricModal') return;
+  document.getElementById('rubricModal').classList.remove('active');
+  _rubricIdeaId = null;
+}
+
+function updateRubricTotal() {
+  const hook = parseInt(document.getElementById('rubricHook').value, 10);
+  const mechanic = parseInt(document.getElementById('rubricMechanic').value, 10);
+  const standing = parseInt(document.getElementById('rubricStanding').value, 10);
+  const freshness = parseInt(document.getElementById('rubricFreshness').value, 10);
+  const reply = parseInt(document.getElementById('rubricReply').value, 10);
+  const voice = parseInt(document.getElementById('rubricVoice').value, 10);
+
+  document.getElementById('rubricHookVal').textContent = hook;
+  document.getElementById('rubricMechanicVal').textContent = mechanic;
+  document.getElementById('rubricStandingVal').textContent = standing;
+  document.getElementById('rubricFreshnessVal').textContent = freshness;
+  document.getElementById('rubricReplyVal').textContent = reply;
+  document.getElementById('rubricVoiceVal').textContent = voice;
+
+  const total = hook + mechanic + standing + freshness + reply + voice;
+  document.getElementById('rubricTotal').textContent = total;
+
+  let tier = 'kill';
+  let tierClass = 'tier-kill';
+  if (total >= 85) { tier = 'hero'; tierClass = 'tier-hero'; }
+  else if (total >= 70) { tier = 'engine'; tierClass = 'tier-engine'; }
+  else if (total >= 50) { tier = 'signal'; tierClass = 'tier-signal'; }
+
+  const tierEl = document.getElementById('rubricTier');
+  tierEl.textContent = 'Tier: ' + tier;
+  tierEl.className = 'rubric-tier ' + tierClass;
+
+  const warnEl = document.getElementById('rubricWarning');
+  warnEl.style.display = total < 50 ? 'block' : 'none';
+
+  const btn = document.getElementById('rubricSubmitBtn');
+  btn.disabled = total < 50;
+  btn.style.opacity = total < 50 ? '0.5' : '1';
+}
+
+async function saveRubricAndPromote() {
+  if (!_rubricIdeaId) return;
+
+  const mechanic = document.getElementById('rubricMechanicSelect').value;
+  if (!mechanic) {
+    showToast('Please select a mechanic', 'error');
+    return;
+  }
+
+  const rubric = {
+    hook_test: parseInt(document.getElementById('rubricHook').value, 10),
+    mechanic_fit: parseInt(document.getElementById('rubricMechanic').value, 10),
+    operator_standing: parseInt(document.getElementById('rubricStanding').value, 10),
+    trend_freshness: parseInt(document.getElementById('rubricFreshness').value, 10),
+    reply_invitation: parseInt(document.getElementById('rubricReply').value, 10),
+    voice_signature: parseInt(document.getElementById('rubricVoice').value, 10),
+  };
+
+  try {
+    // Save rubric
+    const r = await fetch(`{{ account_path_prefix }}/api/content/${_rubricIdeaId}/rubric`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rubric, mechanic})
+    });
+    const rubricData = await r.json();
+    if (!rubricData.success) {
+      showToast(rubricData.error || 'Failed to save rubric', 'error');
+      return;
+    }
+
+    // Move to approved (Queue)
+    const m = await fetch(`{{ account_path_prefix }}/api/content/${_rubricIdeaId}/move`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status: 'approved'})
+    });
+    const moveData = await m.json();
+    if (moveData.success) {
+      showToast('Promoted to Queue', 'success');
+      closeRubricModal();
+      location.reload();
+    } else {
+      showToast(moveData.error || 'Failed to promote', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+let _angleItIntakeId = null;
+let _angleItVariants = [];
+let _selectedVariantIndex = null;
+
+async function convertIntake(id) {
+  _angleItIntakeId = id;
+  _angleItVariants = [];
+  _selectedVariantIndex = null;
+
+  // Show modal in loading state
+  document.getElementById('angleItModal').classList.add('active');
+  document.getElementById('angleItLoading').style.display = 'block';
+  document.getElementById('angleItContent').style.display = 'none';
+  document.getElementById('angleItEditSection').style.display = 'none';
+  document.getElementById('angleItVariants').innerHTML = '';
+
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/intake/${id}/angle-it`, {method: 'POST'});
+    const data = await response.json();
+    if (!data.success) {
+      showToast(data.error || 'Failed to generate angles', 'error');
+      closeAngleItModal();
+      return;
+    }
+    _angleItVariants = data.variants || [];
+    renderAngleItVariants();
+    document.getElementById('angleItLoading').style.display = 'none';
+    document.getElementById('angleItContent').style.display = 'block';
+  } catch (e) {
+    showToast('Network error', 'error');
+    closeAngleItModal();
+  }
+}
+
+function renderAngleItVariants() {
+  const container = document.getElementById('angleItVariants');
+  container.innerHTML = _angleItVariants.map((v, i) => `
+    <div class="variant-card" data-index="${i}" onclick="selectVariant(${i})">
+      <div class="variant-header">
+        <span class="variant-mechanic">${escapeHtml(v.mechanic.replace(/_/g, ' '))}</span>
+        <span class="variant-score">${v.total_score} pts</span>
+      </div>
+      <div class="variant-hook">${escapeHtml(v.hook)}</div>
+      <div class="variant-body">${escapeHtml(v.body)}</div>
+      <div class="variant-reasoning">${escapeHtml(v.reasoning)}</div>
+      <div class="variant-rubric">
+        <span>Hook ${v.rubric.hook_test}</span>
+        <span>Fit ${v.rubric.mechanic_fit}</span>
+        <span>Standing ${v.rubric.operator_standing}</span>
+        <span>Fresh ${v.rubric.trend_freshness}</span>
+        <span>Reply ${v.rubric.reply_invitation}</span>
+        <span>Voice ${v.rubric.voice_signature}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectVariant(index) {
+  _selectedVariantIndex = index;
+  document.querySelectorAll('.variant-card').forEach((el, i) => {
+    el.classList.toggle('selected', i === index);
+  });
+
+  const v = _angleItVariants[index];
+  document.getElementById('angleItEditBody').value = v.body;
+  document.getElementById('angleItEditMechanic').value = v.mechanic;
+  document.getElementById('angleItEditSection').style.display = 'block';
+  updateAngleItCharCounter();
+}
+
+function updateAngleItCharCounter() {
+  const len = document.getElementById('angleItEditBody').value.length;
+  const el = document.getElementById('angleItCharCounter');
+  el.textContent = `${len} chars`;
+  el.className = 'char-counter ' + (len > 500 ? 'danger' : len > 400 ? 'warning' : 'ok');
+}
+
+document.getElementById('angleItEditBody').addEventListener('input', updateAngleItCharCounter);
+
+function cancelAngleItEdit() {
+  _selectedVariantIndex = null;
+  document.getElementById('angleItEditSection').style.display = 'none';
+  document.querySelectorAll('.variant-card').forEach(el => el.classList.remove('selected'));
+}
+
+function closeAngleItModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('angleItModal').classList.remove('active');
+  _angleItIntakeId = null;
+  _angleItVariants = [];
+  _selectedVariantIndex = null;
+}
+
+async function confirmAngleItConversion() {
+  if (_selectedVariantIndex === null || !_angleItIntakeId) return;
+
+  const body = document.getElementById('angleItEditBody').value.trim();
+  const mechanic = document.getElementById('angleItEditMechanic').value;
+  const v = _angleItVariants[_selectedVariantIndex];
+
+  if (!body) {
+    showToast('Draft body cannot be empty', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/intake/${_angleItIntakeId}/convert`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        concept: body,
+        mechanic: mechanic,
+        rubric: v.rubric,
+      })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Converted to draft', 'success');
+      closeAngleItModal();
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to convert', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+async function dismissIdea(id) {
+  if (!confirm('Dismiss this idea?')) return;
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${id}/dismiss`, {method: 'POST'});
+    const data = await response.json();
+    if (data.success) {
+      showToast('Dismissed', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+async function unscheduleIdea(id) {
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${id}/unschedule`, {method: 'POST'});
+    const data = await response.json();
+    if (data.success) {
+      showToast('Unscheduled', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+async function publishNow(id) {
+  if (!confirm('Publish this post now?')) return;
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${id}/publish`, {method: 'POST'});
+    const data = await response.json();
+    if (data.success) {
+      showToast('Published!', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to publish', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+// Schedule Modal
+const _SLOT_MAP = {
+  'hero':  [{label: 'Mon 11:00', day: 1, hour: 11}, {label: 'Fri 11:00', day: 5, hour: 11}],
+  'engine': [{label: 'Tue 12:00', day: 2, hour: 12}, {label: 'Wed 12:00', day: 3, hour: 12}, {label: 'Wed 20:00', day: 3, hour: 20}, {label: 'Thu 12:00', day: 4, hour: 12}, {label: 'Fri 14:00', day: 5, hour: 14}],
+  'signal': [{label: 'Sat 10:00', day: 6, hour: 10}],
+};
+
+let _scheduleTier = null;
+
+function openScheduleModal(id, tier) {
+  currentScheduleId = id;
+  _scheduleTier = tier || '';
+
+  const tierLabel = document.getElementById('scheduleTierLabel');
+  tierLabel.textContent = tier ? `(${tier})` : '';
+
+  const container = document.getElementById('scheduleSlotButtons');
+  container.innerHTML = '';
+
+  const slots = _SLOT_MAP[tier] || [];
+  if (slots.length === 0) {
+    container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.75rem;">No fixed slots for this tier. Use custom time.</span>';
+    document.getElementById('scheduleSlotHint').textContent = '';
+  } else {
+    slots.forEach(slot => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary';
+      btn.style.cssText = 'font-size: 0.75rem; padding: 0.375rem 0.5rem;';
+      btn.textContent = slot.label;
+      btn.onclick = () => applySlotPreset(slot.day, slot.hour);
+      container.appendChild(btn);
+    });
+    document.getElementById('scheduleSlotHint').textContent = `Only ${tier} slots are shown. Custom times outside these slots will be rejected.`;
+  }
+
+  // Set default to tomorrow 9am
+  const now = new Date();
+  const target = new Date(now);
+  target.setDate(now.getDate() + 1);
+  target.setHours(9, 0, 0, 0);
+  const yyyy = target.getFullYear();
+  const mm = String(target.getMonth() + 1).padStart(2, '0');
+  const dd = String(target.getDate()).padStart(2, '0');
+  document.getElementById('scheduleCustomTime').value = `${yyyy}-${mm}-${dd}T09:00`;
+  document.getElementById('scheduleModal').classList.add('active');
+}
+
+function applySlotPreset(targetDay, targetHour) {
+  const now = new Date();
+  let daysAhead = targetDay - now.getDay();
+  if (daysAhead <= 0) daysAhead += 7;
+  const target = new Date(now);
+  target.setDate(now.getDate() + daysAhead);
+  target.setHours(targetHour, 0, 0, 0);
+  const yyyy = target.getFullYear();
+  const mm = String(target.getMonth() + 1).padStart(2, '0');
+  const dd = String(target.getDate()).padStart(2, '0');
+  const hh = String(target.getHours()).padStart(2, '0');
+  document.getElementById('scheduleCustomTime').value = `${yyyy}-${mm}-${dd}T${hh}:00`;
+}
+
+function closeScheduleModal(e) {
+  if (!e || e.target.id === 'scheduleModal') {
+    document.getElementById('scheduleModal').classList.remove('active');
+    currentScheduleId = null;
+  }
+}
+
+function applySchedulePreset(slot) {
+  const now = new Date();
+  let target = new Date(now);
+  
+  if (slot === 'tomorrow-9am') {
+    target.setDate(now.getDate() + 1);
+    target.setHours(9, 0, 0, 0);
+  } else if (slot === 'tomorrow-3pm') {
+    target.setDate(now.getDate() + 1);
+    target.setHours(15, 0, 0, 0);
+  } else if (slot === 'next-fri-9am') {
+    const daysUntilFri = (5 - now.getDay() + 7) % 7 || 7;
+    target.setDate(now.getDate() + daysUntilFri);
+    target.setHours(9, 0, 0, 0);
+  } else if (slot === 'next-fri-3pm') {
+    const daysUntilFri = (5 - now.getDay() + 7) % 7 || 7;
+    target.setDate(now.getDate() + daysUntilFri);
+    target.setHours(15, 0, 0, 0);
+  } else if (slot === 'next-week-mon-9am') {
+    const daysUntilMon = (1 - now.getDay() + 7) % 7 || 7;
+    target.setDate(now.getDate() + daysUntilMon);
+    target.setHours(9, 0, 0, 0);
+  }
+  
+  const yyyy = target.getFullYear();
+  const mm = String(target.getMonth() + 1).padStart(2, '0');
+  const dd = String(target.getDate()).padStart(2, '0');
+  const hh = String(target.getHours()).padStart(2, '0');
+  const min = String(target.getMinutes()).padStart(2, '0');
+  document.getElementById('scheduleCustomTime').value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+async function confirmSchedule() {
+  if (!currentScheduleId) return;
+  const customTime = document.getElementById('scheduleCustomTime').value;
+  if (!customTime) {
+    showToast('Please select a time', 'error');
+    return;
+  }
+  // Interpret input as Jakarta time (UTC+7) and convert to UTC ISO
+  const jakartaIso = new Date(customTime + '+07:00').toISOString();
+  try {
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${currentScheduleId}/schedule`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({custom_time: jakartaIso})
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Scheduled!', 'success');
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+  closeScheduleModal();
+}
+
+// Edit Modal
+function startEdit(id) {
+  currentEditId = id;
+  const content = document.getElementById(`content-${id}`).textContent;
+  document.getElementById('editContent').value = content;
+  // Clear file input
+  document.getElementById('editImageFile').value = '';
+  document.getElementById('editImagePreview').style.display = 'none';
+  document.getElementById('editImageUrl').value = '';
+  document.getElementById('imagePreview').style.display = 'none';
+  updateEditCharCount();
+  document.getElementById('editModal').classList.add('active');
+}
+
+function closeEditModal(e) {
+  if (!e || e.target.id === 'editModal') {
+    document.getElementById('editModal').classList.remove('active');
+    currentEditId = null;
+  }
+}
+
+function updateEditCharCount() {
+  const content = document.getElementById('editContent').value;
+  const count = content.length;
+  const counter = document.getElementById('editCharCount');
+  const remaining = 280 - count;
+  counter.textContent = `${count}/280 ${remaining >= 0 ? '(' + remaining + ' left)' : '(' + Math.abs(remaining) + ' over!)'}`;
+  counter.className = 'char-counter ' + (count > 280 ? 'danger' : count > 250 ? 'warning' : 'ok');
+}
+
+function updateEditImagePreview() {
+  const fileInput = document.getElementById('editImageFile');
+  const preview = document.getElementById('editImagePreview');
+  const file = fileInput.files[0];
+  
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function updateImagePreview() {
+  const url = document.getElementById('editImageUrl').value;
+  const preview = document.getElementById('imagePreview');
+  if (url) {
+    preview.src = url;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+async function saveEdit() {
+  if (!currentEditId) return;
+  const content = document.getElementById('editContent').value;
+  const imageUrl = document.getElementById('editImageUrl').value;
+  const imageFile = document.getElementById('editImageFile').files[0];
+  const useExternal = document.getElementById('editImageUploadExternal').checked;
+  
+  if (content.length > 280) {
+    showToast('Error: Content exceeds 280 character limit', 'error');
+    return;
+  }
+  
+  try {
+    // Save content
+    const response = await fetch(`{{ account_path_prefix }}/api/content/${currentEditId}/edit`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({concept: content})
+    });
+    
+    // Upload image file if selected
+    let uploadWarning = null;
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      
+      const endpoint = useExternal ? `{{ account_path_prefix }}/api/content/${currentEditId}/upload-image-external` : `{{ account_path_prefix }}/api/content/${currentEditId}/upload-image`;
+      const uploadResponse = await fetch(endpoint, {
+        method: 'POST',
+        body: formData
+      });
+      const uploadData = await uploadResponse.json();
+      if (!uploadData.success) {
+        showToast(uploadData.error || 'Failed to upload image', 'error');
+        return;
+      }
+      if (uploadData.warning) {
+        uploadWarning = uploadData.warning;
+      }
+    }
+    // Or use URL if provided
+    else if (imageUrl) {
+      await fetch(`{{ account_path_prefix }}/api/content/${currentEditId}/image`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({image_url: imageUrl})
+      });
+    }
+    
+    const data = await response.json();
+    if (data.success) {
+      if (uploadWarning) {
+        showToast(uploadWarning, 'error');
+      } else {
+        showToast('Saved', 'success');
+      }
+      location.reload();
+    } else {
+      showToast(data.error || 'Failed to save', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+// Image Modal
+function openImageModal(id) {
+  currentImageId = id;
+  // Clear previous inputs
+  document.getElementById('imageFileInput').value = '';
+  document.getElementById('fileUploadPreview').style.display = 'none';
+  document.getElementById('imageUrlInput').value = '';
+  document.getElementById('imageModalPreview').style.display = 'none';
+  document.getElementById('imageModal').classList.add('active');
+}
+
+function closeImageModal(e) {
+  if (!e || e.target.id === 'imageModal') {
+    document.getElementById('imageModal').classList.remove('active');
+    currentImageId = null;
+  }
+}
+
+function previewFileUpload() {
+  const fileInput = document.getElementById('imageFileInput');
+  const preview = document.getElementById('fileUploadPreview');
+  const file = fileInput.files[0];
+  
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function updateImageModalPreview() {
+  const url = document.getElementById('imageUrlInput').value;
+  const preview = document.getElementById('imageModalPreview');
+  if (url) {
+    preview.src = url;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+async function saveImage() {
+  if (!currentImageId) return;
+  
+  const fileInput = document.getElementById('imageFileInput');
+  const urlInput = document.getElementById('imageUrlInput').value;
+  const useExternal = document.getElementById('imageUploadExternal').checked;
+  
+  try {
+    // If file is selected, upload it
+    if (fileInput.files && fileInput.files[0]) {
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      
+      const endpoint = useExternal ? `{{ account_path_prefix }}/api/content/${currentImageId}/upload-image-external` : `{{ account_path_prefix }}/api/content/${currentImageId}/upload-image`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        if (data.warning) {
+          showToast(data.warning, 'error');
+        } else {
+          showToast('Image uploaded', 'success');
+        }
+        location.reload();
+      } else {
+        showToast(data.error || 'Failed to upload', 'error');
+      }
+    } 
+    // Otherwise use URL
+    else if (urlInput) {
+      const response = await fetch(`{{ account_path_prefix }}/api/content/${currentImageId}/image`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({image_url: urlInput})
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        showToast('Image added', 'success');
+        location.reload();
+      } else {
+        showToast(data.error || 'Failed', 'error');
+      }
+    } else {
+      showToast('Please select a file or enter a URL', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+  closeImageModal();
+}
+
+// Generate Modal
+function openGenerateModal() {
+  document.getElementById('generateModal').classList.add('active');
+}
+
+function closeGenerateModal(e) {
+  if (!e || e.target.id === 'generateModal') {
+    document.getElementById('generateModal').classList.remove('active');
+  }
+}
+
+// Experiment Generate Modal
+async function openExperimentGenerateModal() {
+  const list = document.getElementById('experimentsList');
+  const btn = document.getElementById('generateExperimentBtn');
+  const hiddenInput = document.getElementById('selectedExperimentId');
+  
+  list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading active experiments...</div>';
+  btn.disabled = true;
+  hiddenInput.value = '';
+  
+  try {
+    const response = await fetch('{{ account_path_prefix }}/api/experiments/active');
+    const experiments = await response.json();
+    
+    if (experiments.length === 0) {
+      list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No active experiments found.<br>Start an experiment from the Experiments page first.</div>';
+    } else {
+      list.innerHTML = '';
+      experiments.forEach(exp => {
+        const card = document.createElement('div');
+        card.className = 'experiment-card';
+        card.dataset.id = exp.id;
+        card.innerHTML = `
+          <div class="experiment-header">
+            <span class="experiment-category">${exp.category}</span>
+            <span class="experiment-check">✓</span>
+          </div>
+          <div class="experiment-title">${escapeHtml(exp.title)}</div>
+          <div class="experiment-hypothesis">${escapeHtml(exp.hypothesis)}</div>
+        `;
+        card.onclick = () => selectExperiment(exp.id);
+        list.appendChild(card);
+      });
+    }
+  } catch (e) {
+    console.error('Failed to load experiments:', e);
+    list.innerHTML = '<div style="text-align: center; color: var(--neg); padding: 2rem;">Failed to load experiments. Please try again.</div>';
+  }
+  
+  document.getElementById('experimentGenerateModal').classList.add('active');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function selectExperiment(id) {
+  document.getElementById('selectedExperimentId').value = id;
+  
+  document.querySelectorAll('.experiment-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.id == id);
+  });
+  
+  document.getElementById('generateExperimentBtn').disabled = false;
+}
+
+function closeExperimentGenerateModal(e) {
+  if (!e || e.target.id === 'experimentGenerateModal') {
+    document.getElementById('experimentGenerateModal').classList.remove('active');
+  }
+}
+
+// Toast
+function showToast(message, type) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeGenerateModal();
+    closeExperimentGenerateModal();
+    closeEditModal();
+    closeImageModal();
+    closeScheduleModal();
+  }
+  if (e.key === 'n' || e.key === 'N') {
+    if (!document.querySelector('.modal-overlay.active')) {
+      openGenerateModal();
+    }
+  }
+});
+</script>
+
+{% endblock %}

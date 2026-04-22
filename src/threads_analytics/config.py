@@ -9,8 +9,10 @@ otherwise silently shadow the real key in .env.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,6 +64,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "anthropic/claude-sonnet-4.6"
 
+    # Hermes bridge
+    hermes_api_key: str = ""
+
     # Storage
     database_url: str = "sqlite:///data/threads.db"
 
@@ -69,8 +74,25 @@ class Settings(BaseSettings):
     keyword_search_budget_per_run: int = 30
     keyword_search_rolling_budget: int = 400
 
+    # Scheduling timezone (default: Asia/Jakarta / WIB UTC+7)
+    schedule_timezone: str = "Asia/Jakarta"
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class ThreadsCredentials:
+    access_token: str = ""
+    user_id: str = ""
+    handle: str = ""
+
+
+def _account_value(account: object | None, field_name: str) -> str:
+    if account is None:
+        return ""
+    value = getattr(account, field_name, None)
+    return value or ""
 
 
 def _resolve_sqlite_url(url: str) -> str:
@@ -91,6 +113,26 @@ def _resolve_sqlite_url(url: str) -> str:
     abs_path = (PROJECT_ROOT / rest).resolve()
     abs_path.parent.mkdir(parents=True, exist_ok=True)
     return f"{prefix}{abs_path}"
+
+
+def get_schedule_timezone() -> ZoneInfo:
+    return ZoneInfo(get_settings().schedule_timezone)
+
+
+def get_threads_credentials(account: object | None = None) -> ThreadsCredentials:
+    """Return Threads credentials for an account, falling back to global settings.
+
+    The default account still uses `.env` values when no account-specific values are
+    present, but callers now have a single helper for account-aware credential lookup.
+    """
+
+    settings = get_settings()
+    return ThreadsCredentials(
+        access_token=_account_value(account, "threads_access_token")
+        or settings.threads_access_token,
+        user_id=_account_value(account, "threads_user_id") or settings.threads_user_id,
+        handle=_account_value(account, "threads_handle") or settings.threads_handle,
+    )
 
 
 @lru_cache(maxsize=1)

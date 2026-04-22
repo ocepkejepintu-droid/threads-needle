@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
-from .models import Experiment, MyPost, PostTopic
+from .models import MyPost, PostTopic
 
 
 Bucket = Literal["variant", "control"]
@@ -139,7 +138,7 @@ def _classify_hook(post: MyPost, spec: dict[str, Any]) -> Classification:
             pass
     if matched:
         return Classification("variant", why)
-    return Classification("control", f"did not match any hook pattern")
+    return Classification("control", "did not match any hook pattern")
 
 
 def _classify_topic(session: Session, post: MyPost, spec: dict[str, Any]) -> Classification:

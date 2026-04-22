@@ -54,13 +54,9 @@ def backfill_history(
 
     with session_scope() as session:
         # 1. Find the oldest post we have — that bounds how far back we can go.
-        oldest = session.scalar(
-            select(MyPost).order_by(MyPost.created_at.asc()).limit(1)
-        )
+        oldest = session.scalar(select(MyPost).order_by(MyPost.created_at.asc()).limit(1))
         if oldest is None:
             return {"backfilled_runs": 0, "reason": "no posts in db"}
-        oldest_post_date = oldest.created_at.replace(tzinfo=timezone.utc) if oldest.created_at.tzinfo is None else oldest.created_at
-
         # 2. Get the most-recent real follower count to carry through.
         real_acc = session.scalar(
             select(MyAccountInsight).order_by(MyAccountInsight.fetched_at.desc()).limit(1)

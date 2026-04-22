@@ -9,17 +9,16 @@ engine and the Experiments dashboard page.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from .metrics import METRIC_META, METRIC_ORDER
+from .metrics import METRIC_ORDER
 from .models import (
     Experiment,
-    ExperimentPostClassification,
     ExperimentVerdict,
 )
 from .predicates import PER_POST_CATEGORIES, PER_WINDOW_CATEGORIES
@@ -55,6 +54,7 @@ class CategoryStats:
 def create_experiment(
     session: Session,
     *,
+    account_id: int,
     title: str,
     hypothesis: str,
     category: str,
@@ -73,6 +73,7 @@ def create_experiment(
         raise ValueError(f"unknown metric: {primary_metric}")
 
     exp = Experiment(
+        account_id=account_id,
         title=title,
         hypothesis=hypothesis,
         category=category,
@@ -149,7 +150,7 @@ def abandon_experiment(session: Session, exp: Experiment) -> Experiment:
 # ---------- background maintenance ----------
 
 
-def auto_evaluate_due(session: Session) -> list[int]:
+def auto_evaluate_due(session: Session, account_id: int) -> list[int]:
     """Find active experiments whose variant_end has passed and evaluate them.
 
     Returns the list of experiment IDs that transitioned to completed.
@@ -157,6 +158,7 @@ def auto_evaluate_due(session: Session) -> list[int]:
     now = datetime.now(timezone.utc)
     due = session.scalars(
         select(Experiment).where(
+            Experiment.account_id == account_id,
             Experiment.status == "active",
             Experiment.variant_end.is_not(None),
             Experiment.variant_end <= now,
@@ -172,11 +174,14 @@ def auto_evaluate_due(session: Session) -> list[int]:
     return ids
 
 
-def classify_active_experiments(session: Session) -> int:
+def classify_active_experiments(session: Session, account_id: int) -> int:
     """For every active experiment, refresh the per-post classifications so the
     dashboard always shows the latest variant/control counts."""
     active = session.scalars(
-        select(Experiment).where(Experiment.status == "active")
+        select(Experiment).where(
+            Experiment.account_id == account_id,
+            Experiment.status == "active",
+        )
     ).all()
     total = 0
     for exp in active:
@@ -193,18 +198,26 @@ def classify_active_experiments(session: Session) -> int:
 
 
 def list_experiments(
-    session: Session, status: str | None = None, limit: int = 100
+    session: Session, account_id: int, status: str | None = None, limit: int = 100
 ) -> list[Experiment]:
-    q = select(Experiment).order_by(desc(Experiment.created_at)).limit(limit)
+    q = (
+        select(Experiment)
+        .where(Experiment.account_id == account_id)
+        .order_by(desc(Experiment.created_at))
+        .limit(limit)
+    )
     if status:
         q = q.where(Experiment.status == status)
     return list(session.scalars(q).all())
 
 
-def personal_category_performance(session: Session) -> dict[str, CategoryStats]:
+def personal_category_performance(session: Session, account_id: int) -> dict[str, CategoryStats]:
     """Aggregate verdict history per category for the track record widget."""
     exps = session.scalars(
-        select(Experiment).where(Experiment.status.in_(["completed", "abandoned"]))
+        select(Experiment).where(
+            Experiment.account_id == account_id,
+            Experiment.status.in_(["completed", "abandoned"]),
+        )
     ).all()
     out: dict[str, CategoryStats] = {}
     for exp in exps:
@@ -220,9 +233,7 @@ def personal_category_performance(session: Session) -> dict[str, CategoryStats]:
             if v.effect_size_pct is not None:
                 # running average
                 prior = bucket.avg_win_effect_pct or 0
-                bucket.avg_win_effect_pct = (
-                    prior + (v.effect_size_pct - prior) / bucket.wins
-                )
+                bucket.avg_win_effect_pct = prior + (v.effect_size_pct - prior) / bucket.wins
         elif v.verdict == "loss":
             bucket.losses += 1
         elif v.verdict == "null":

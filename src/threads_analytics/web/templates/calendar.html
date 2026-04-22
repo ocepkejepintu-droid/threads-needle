@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="calendar-header">
+  <h1>Content Calendar</h1>
+  <div class="calendar-nav">
+  <a href="{{ account_path_prefix }}/calendar?week={{ prev_week }}" class="btn btn-secondary">← Prev</a>
+    <span class="week-label">{{ week_label }}</span>
+  <a href="{{ account_path_prefix }}/calendar?week={{ next_week }}" class="btn btn-secondary">Next →</a>
+  </div>
+</div>
+
+<div class="calendar-legend">
+  <span class="legend-item"><span class="dot scheduled"></span> Scheduled</span>
+  <span class="legend-item"><span class="dot published"></span> Published</span>
+  <span class="legend-item"><span class="dot failed"></span> Failed</span>
+</div>
+
+<div class="calendar-grid">
+  {% for day in days %}
+  <div class="calendar-day {% if day.is_today %}today{% endif %}">
+    <div class="day-header">
+      <span class="day-name">{{ day.name }}</span>
+      <span class="day-date">{{ day.date }}</span>
+    </div>
+    <div class="day-posts">
+      {% for post in day.posts %}
+      <div class="post-card status-{{ post.status }}" data-post-id="{{ post.id }}">
+        <div class="post-header">
+          <span class="post-time">{{ post.time }}</span>
+          <span class="post-status">{{ post.status }}</span>
+        </div>
+        <div class="post-preview" onclick="openPostModal({{ post.id }})">{{ post.preview }}</div>
+        <div class="post-actions">
+          <button class="action-btn" onclick="openPostModal({{ post.id }})" title="View/Edit">✏️</button>
+          {% if post.status != 'published' %}
+          <button class="action-btn danger" onclick="deletePost({{ post.id }})" title="Delete">🗑️</button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if day.posts|length == 0 %}
+      <div class="empty-slot">No posts</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Post Detail/Edit Modal -->
+<div class="modal-overlay" id="postModal" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modalTitle">Edit Post</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editPostId">
+      <div class="form-group">
+        <label>Content <span class="char-count" id="charCount">0/280</span></label>
+        <textarea id="editPostContent" rows="6" placeholder="Write your post..." oninput="updateCharCount()"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Scheduled Time (Jakarta WIB)</label>
+        <input type="datetime-local" id="editPostTime">
+        <small class="form-hint">Will be posted at this time in Jakarta timezone (UTC+7)</small>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="editPostStatus">
+          <option value="scheduled">Scheduled</option>
+          <option value="draft">Draft (unschedule)</option>
+        </select>
+      </div>
+      <div class="post-meta" id="postMeta"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePost()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.week-label {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.scheduled { background: var(--link); }
+.dot.published { background: var(--pos); }
+.dot.failed { background: var(--neg); }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+}
+
+.calendar-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 200px;
+}
+
+.calendar-day.today {
+  border-color: var(--link);
+  box-shadow: 0 0 0 1px var(--link);
+}
+
+.day-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.day-name {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.day-date {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.day-posts {
+  padding: 8px;
+}
+
+.post-card {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.post-card:hover {
+  border-color: var(--link);
+  transform: translateY(-1px);
+}
+
+.post-card.status-scheduled {
+  border-color: var(--link);
+  background: rgba(0, 149, 246, 0.1);
+}
+
+.post-card.status-published {
+  border-color: var(--pos);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.post-card.status-failed {
+  border-color: var(--neg);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.post-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.post-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.post-preview {
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.post-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.post-card:hover .post-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background: var(--link);
+  border-color: var(--link);
+  color: white;
+}
+
+.action-btn.danger:hover {
+  background: var(--neg);
+  border-color: var(--neg);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--link);
+}
+
+.post-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.char-count {
+  font-size: 12px;
+  font-weight: normal;
+  margin-left: 8px;
+  color: var(--text-muted);
+}
+
+.char-count.warning {
+  color: var(--warn);
+}
+
+.char-count.danger {
+  color: var(--neg);
+  font-weight: 600;
+}
+
+.char-count.ok {
+  color: var(--pos);
+}
+
+.form-hint {
+  color: var(--text-muted);
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.empty-slot {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 28px 10px;
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+}
+
+@media (max-width: 900px) {
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendar-day {
+    min-height: auto;
+  }
+  
+  .post-actions {
+    opacity: 1;
+  }
+}
+</style>
+
+<script>
+// Posts data from server
+const postsData = {
+{% for day in days %}
+{% for post in day.posts %}
+  {{ post.id }}: {
+    id: {{ post.id }},
+    time: "{{ post.time }}",
+    preview: {{ post.preview|tojson }},
+    status: "{{ post.status }}",
+    fullContent: {{ post.full_content|default(post.preview)|tojson }},
+    scheduledAt: "{{ post.scheduled_at_iso|default('') }}"
+  },
+{% endfor %}
+{% endfor %}
+};
+
+function updateCharCount() {
+  const content = document.getElementById('editPostContent').value;
+  const count = content.length;
+  const counter = document.getElementById('charCount');
+  const remaining = 280 - count;
+  
+  counter.textContent = `${count}/280 ${remaining >= 0 ? '(' + remaining + ' left)' : '(' + Math.abs(remaining) + ' over!)'}`;
+  counter.className = 'char-count ' + (count > 280 ? 'danger' : count > 250 ? 'warning' : 'ok');
+}
+
+function openPostModal(postId) {
+  const post = postsData[postId];
+  if (!post) return;
+  
+  document.getElementById('editPostId').value = postId;
+  document.getElementById('editPostContent').value = post.fullContent || post.preview;
+  document.getElementById('editPostStatus').value = post.status === 'failed' ? 'scheduled' : post.status;
+  
+  // Update character counter
+  updateCharCount();
+  
+  // Format datetime-local (convert UTC to browser local time)
+  if (post.scheduledAt) {
+    const date = new Date(post.scheduledAt);
+    // Convert to YYYY-MM-DDTHH:mm format for datetime-local input
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const localIso = `${year}-${month}-${day}T${hours}:${minutes}`;
+    document.getElementById('editPostTime').value = localIso;
+  }
+  
+  // Show meta
+  const metaHtml = `
+    <div>Post ID: ${postId}</div>
+    <div>Current status: ${post.status}</div>
+  `;
+  document.getElementById('postMeta').innerHTML = metaHtml;
+  
+  document.getElementById('postModal').classList.add('active');
+}
+
+function closeModal(event) {
+  if (!event || event.target.id === 'postModal') {
+    document.getElementById('postModal').classList.remove('active');
+  }
+}
+
+async function savePost() {
+  const postId = document.getElementById('editPostId').value;
+  const content = document.getElementById('editPostContent').value;
+  const scheduledTime = document.getElementById('editPostTime').value;
+  const status = document.getElementById('editPostStatus').value;
+  
+  // Check character limit
+  if (content.length > 280) {
+    alert('Error: Content exceeds 280 character limit. Please shorten your post.');
+    return;
+  }
+  
+  try {
+    const resp = await fetch(`{{ account_path_prefix }}/api/content/${postId}/edit`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({concept: content})
+    });
+    
+    if (!resp.ok) throw new Error('Failed to update content');
+    
+    // Update schedule if time changed
+    if (scheduledTime) {
+      const scheduleResp = await fetch(`{{ account_path_prefix }}/api/content/${postId}/schedule`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({custom_time: new Date(scheduledTime).toISOString()})
+      });
+      if (!scheduleResp.ok) throw new Error('Failed to reschedule');
+    }
+    
+    // Update status if changed to draft
+    if (status === 'draft') {
+      const moveResp = await fetch(`{{ account_path_prefix }}/api/content/${postId}/unschedule`, {
+        method: 'POST'
+      });
+      if (!moveResp.ok) throw new Error('Failed to unschedule');
+    }
+    
+    window.location.reload();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deletePost(postId) {
+  if (!confirm('Delete this post? This cannot be undone.')) return;
+  
+  try {
+    const resp = await fetch(`{{ account_path_prefix }}/api/content/${postId}/dismiss`, {
+      method: 'POST'
+    });
+    
+    if (resp.ok) {
+      window.location.reload();
+    } else {
+      alert('Failed to delete');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
+</script>
+
+{% endblock %}

@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="exp-head-row">
-  <a href="/experiments" class="back-link">← all experiments</a>
+  <a href="{{ account_path_prefix }}/experiments" class="back-link">← all experiments</a>
   <span class="exp-status-pill status-{{ exp.status }}">{{ exp.status | upper }}</span>
 </div>
 
@@ -45,14 +45,14 @@
 
   <form class="action-row">
     {% if exp.status == "proposed" %}
-      <button formaction="/experiments/{{ exp.id }}/start" formmethod="post">Start experiment</button>
+      <button formaction="{{ account_path_prefix }}/experiments/{{ exp.id }}/start" formmethod="post">Start experiment</button>
     {% endif %}
     {% if exp.status == "active" %}
-      <button formaction="/experiments/{{ exp.id }}/evaluate" formmethod="post">Evaluate now</button>
-      <button formaction="/experiments/{{ exp.id }}/end" formmethod="post">End now</button>
+      <button formaction="{{ account_path_prefix }}/experiments/{{ exp.id }}/evaluate" formmethod="post">Evaluate now</button>
+      <button formaction="{{ account_path_prefix }}/experiments/{{ exp.id }}/end" formmethod="post">End now</button>
     {% endif %}
     {% if exp.status in ("proposed", "active") %}
-      <button formaction="/experiments/{{ exp.id }}/abandon" formmethod="post" class="danger">Abandon</button>
+      <button formaction="{{ account_path_prefix }}/experiments/{{ exp.id }}/abandon" formmethod="post" class="danger">Abandon</button>
     {% endif %}
   </form>
 </section>

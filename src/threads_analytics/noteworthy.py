@@ -15,7 +15,6 @@ import logging
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session

@@ -16,7 +16,6 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -145,11 +144,15 @@ class GroundTruthPanel:
 
 
 def _rows_for_window(
-    session: Session, since: datetime, until: datetime
+    session: Session, since: datetime, until: datetime, account_id: int
 ) -> list[dict]:
     """Return simplified post rows (with their latest insights) created in the window."""
     posts = session.scalars(
-        select(MyPost).where(MyPost.created_at >= since, MyPost.created_at < until)
+        select(MyPost).where(
+            MyPost.account_id == account_id,
+            MyPost.created_at >= since,
+            MyPost.created_at < until,
+        )
     ).all()
     if not posts:
         return []
@@ -157,7 +160,9 @@ def _rows_for_window(
     # Latest insight per post (by fetched_at desc)
     latest: dict[str, MyPostInsight] = {}
     all_ins = session.scalars(
-        select(MyPostInsight).order_by(MyPostInsight.fetched_at.desc())
+        select(MyPostInsight)
+        .where(MyPostInsight.account_id == account_id)
+        .order_by(MyPostInsight.fetched_at.desc())
     ).all()
     for ins in all_ins:
         latest.setdefault(ins.thread_id, ins)
@@ -181,10 +186,13 @@ def _rows_for_window(
     return rows
 
 
-def _latest_follower_count(session: Session, at_or_before: datetime) -> int | None:
+def _latest_follower_count(session: Session, at_or_before: datetime, account_id: int) -> int | None:
     snap = session.scalar(
         select(MyAccountInsight)
-        .where(MyAccountInsight.fetched_at <= at_or_before)
+        .where(
+            MyAccountInsight.account_id == account_id,
+            MyAccountInsight.fetched_at <= at_or_before,
+        )
         .order_by(MyAccountInsight.fetched_at.desc())
         .limit(1)
     )
@@ -196,12 +204,13 @@ def compute_metric(
     name: str,
     since: datetime,
     until: datetime,
+    account_id: int,
 ) -> MetricValue:
     """Compute a single metric for an arbitrary window."""
-    rows = _rows_for_window(session, since, until)
+    rows = _rows_for_window(session, since, until, account_id)
 
     if name == METRIC_REACH_RATE:
-        followers = _latest_follower_count(session, until)
+        followers = _latest_follower_count(session, until, account_id)
         if not rows or not followers or followers == 0:
             return MetricValue(name, None, since, until, len(rows))
         reach_rates = [r["views"] / followers for r in rows]
@@ -211,7 +220,10 @@ def compute_metric(
             since,
             until,
             len(rows),
-            detail={"follower_count": followers, "median_views": statistics.median([r["views"] for r in rows])},
+            detail={
+                "follower_count": followers,
+                "median_views": statistics.median([r["views"] for r in rows]),
+            },
         )
 
     if name == METRIC_REPLY_RATE_PER_VIEW:
@@ -275,8 +287,8 @@ def compute_metric(
 
     if name == METRIC_FOLLOWER_VELOCITY:
         # 7-day rolling: (followers at `until`) - (followers 7 days before `until`) / 7
-        end_count = _latest_follower_count(session, until)
-        start_count = _latest_follower_count(session, until - timedelta(days=7))
+        end_count = _latest_follower_count(session, until, account_id)
+        start_count = _latest_follower_count(session, until - timedelta(days=7), account_id)
         if end_count is None or start_count is None:
             return MetricValue(name, None, since, until, len(rows))
         return MetricValue(
@@ -292,7 +304,7 @@ def compute_metric(
 
 
 def compute_ground_truth(
-    session: Session, window_days: int = 14
+    session: Session, account_id: int, window_days: int = 14
 ) -> GroundTruthPanel:
     """Compute the full Ground Truth panel: all six metrics + baselines + trend sparklines."""
     now = datetime.now(timezone.utc)
@@ -305,8 +317,8 @@ def compute_ground_truth(
     deltas: dict[str, float | None] = {}
 
     for name in METRIC_ORDER:
-        current = compute_metric(session, name, current_start, now)
-        base = compute_metric(session, name, baseline_start, baseline_end)
+        current = compute_metric(session, name, current_start, now, account_id)
+        base = compute_metric(session, name, baseline_start, baseline_end, account_id)
         metrics[name] = current
         baselines[name] = base
         deltas[name] = _relative_delta(base.value, current.value)
@@ -319,7 +331,7 @@ def compute_ground_truth(
         end = now - timedelta(days=bucket_days * (bucket_count - 1 - i))
         start = end - timedelta(days=bucket_days)
         for name in METRIC_ORDER:
-            mv = compute_metric(session, name, start, end)
+            mv = compute_metric(session, name, start, end, account_id)
             trend[name].append(MetricSeriesPoint(when=end, value=mv.value))
 
     verdict_headline = _build_verdict_headline(metrics, baselines, deltas)

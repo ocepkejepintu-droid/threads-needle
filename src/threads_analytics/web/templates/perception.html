@@ -13,7 +13,7 @@
     {% if perception.thin_slice %}
       <section class="span-4 card-hero card-hero-yellow perception-pullquote">
         <div class="perception-pullquote-label">Thin-slice judgment<span class="asterisk"></span></div>
-        <p class="perception-pullquote-text">“{{ perception.thin_slice }}”</p>
+        <p class="perception-pullquote-text">"{{ perception.thin_slice }}"</p>
       </section>
     {% endif %}
 
@@ -125,6 +125,46 @@
   </div>
 
 {% else %}
-  <p class="muted">No public perception generated yet. Run the pipeline.</p>
+  <div class="empty-state card">
+    <div class="empty-icon">👁️</div>
+    <h3>No public perception report yet</h3>
+    <p class="muted">
+      Run the full pipeline to generate a research-grounded thin-slice read of your profile,
+      using the Big Five framework and the Brunswik lens model of cue-based perception.
+    </p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="triggerRun()">Run pipeline now</button>
+      <a href="{{ account_path_prefix }}/you" class="btn">View You profile</a>
+    </div>
+  </div>
+
+  <style>
+  .empty-state {
+    text-align: center;
+    padding: 48px 28px;
+  }
+  .empty-icon {
+    font-size: 40px;
+    line-height: 1;
+    margin-bottom: 14px;
+  }
+  .empty-state h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--text);
+  }
+  .empty-state .muted {
+    max-width: 56ch;
+    margin: 0 auto 18px;
+    line-height: 1.55;
+  }
+  .empty-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  </style>
 {% endif %}
 {% endblock %}

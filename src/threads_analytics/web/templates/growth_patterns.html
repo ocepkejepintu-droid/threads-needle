@@ -1,39 +1,445 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Your Winning Patterns</h1>
 
-{% for pattern_type, patterns in patterns_by_type.items() %}
-<section class="pattern-section">
-  <h2>{{ pattern_type|title }}s ({{ patterns|length }})</h2>
-  
-  {% for pattern in patterns %}
-  <div class="pattern-card">
-    <div class="pattern-header">
-      <h3>{{ pattern.pattern_name }}</h3>
-      <span class="confidence">{{ "%.0f"|format(pattern.confidence_score * 100) }}% confidence</span>
+<div class="patterns-header">
+  <h1>Your Winning Patterns</h1>
+  <a href="{{ account_path_prefix }}/growth/ideas" class="btn btn-primary">Browse Ideas</a>
+</div>
+
+{% set total_patterns = patterns_by_type.values() | map('length') | sum %}
+
+{% if total_patterns == 0 %}
+  <div class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <h2>No patterns found yet</h2>
+    <p class="muted">Run the pipeline to analyze your posts and surface repeatable wins.</p>
+    <a href="{{ account_path_prefix }}" class="btn btn-secondary">Back to Dashboard</a>
+  </div>
+{% else %}
+
+  <div class="patterns-summary card">
+    <div class="summary-stat">
+      <span class="summary-number">{{ total_patterns }}</span>
+      <span class="summary-label">Total patterns</span>
     </div>
-    
-    <p class="pattern-description">{{ pattern.description }}</p>
-    
-    <div class="pattern-stats">
-      <span>Used in {{ pattern.example_count }} posts</span>
-      <span>Avg views: {{ pattern.avg_views|intcomma }}</span>
-      <span>Success rate: {{ "%.0f"|format(pattern.success_rate * 100) }}%</span>
+    {% for pattern_type, patterns in patterns_by_type.items() %}
+    <div class="summary-stat">
+      <span class="summary-number">{{ patterns|length }}</span>
+      <span class="summary-label">{{ pattern_type|title }}s</span>
     </div>
-    
-    <div class="pattern-examples">
-      <h4>Examples:</h4>
-      {% for example in pattern.examples[:2] %}
-      <blockquote>{{ example.text[:100] }}...</blockquote>
+    {% endfor %}
+  </div>
+
+  {% for pattern_type, patterns in patterns_by_type.items() %}
+  <section class="pattern-section">
+    <div class="section-header">
+      <h2>{{ pattern_type|title }}s</h2>
+      <span class="section-count">{{ patterns|length }}</span>
+    </div>
+
+    <div class="pattern-grid">
+      {% for pattern in patterns %}
+      <div class="pattern-card" data-pattern="{{ pattern.id }}">
+        <div class="pattern-header">
+          <h3>{{ pattern.pattern_name }}</h3>
+          <div class="confidence-badge">
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width: {{ pattern.confidence_score * 100 }}%"></div>
+            </div>
+            <span class="confidence-text">{{ "%.0f"|format(pattern.confidence_score * 100) }}%</span>
+          </div>
+        </div>
+
+        <p class="pattern-description">{{ pattern.description }}</p>
+
+        <div class="pattern-stats">
+          <span class="stat-chip">
+            <span class="stat-chip-value">{{ pattern.example_count }}</span>
+            <span class="stat-chip-label">posts</span>
+          </span>
+          <span class="stat-chip">
+            <span class="stat-chip-value">{{ pattern.avg_views|intcomma }}</span>
+            <span class="stat-chip-label">avg views</span>
+          </span>
+          <span class="stat-chip">
+            <span class="stat-chip-value">{{ "%.0f"|format(pattern.success_rate * 100) }}%</span>
+            <span class="stat-chip-label">success</span>
+          </span>
+        </div>
+
+        {% if pattern.examples %}
+        <div class="pattern-examples">
+          <h4>Examples</h4>
+          {% for example in pattern.examples %}
+          <blockquote class="example-quote {% if loop.index > 2 %}collapsed{% endif %}">
+            <p>{{ example.text }}</p>
+            {% if example.permalink %}
+            <a href="{{ example.permalink }}" target="_blank" rel="noopener" class="example-link">View post →</a>
+            {% endif %}
+          </blockquote>
+          {% endfor %}
+          {% if pattern.examples|length > 2 %}
+          <button class="toggle-examples">Show {{ pattern.examples|length - 2 }} more</button>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <button class="generate-btn btn btn-secondary"
+                data-pattern="{{ pattern.id }}"
+                data-account="{{ account_path_prefix }}">
+          Generate Ideas Like This
+        </button>
+      </div>
       {% endfor %}
     </div>
-    
-    <button class="btn btn-secondary generate-btn" data-pattern="{{ pattern.id }}">
-      Generate Ideas Like This
-    </button>
-  </div>
+  </section>
   {% endfor %}
-</section>
-{% endfor %}
+
+{% endif %}
+
+<script>
+document.querySelectorAll('.generate-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    const patternId = btn.dataset.pattern;
+    const accountPrefix = btn.dataset.account;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+    try {
+      const resp = await fetch(`${accountPrefix}/growth/patterns/${patternId}/generate`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+      });
+
+      if (resp.ok) {
+        window.location.href = accountPrefix + '/growth/ideas';
+      } else {
+        const data = await resp.json().catch(function() { return {}; });
+        alert(data.detail || 'Failed to generate ideas');
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+});
+
+document.querySelectorAll('.toggle-examples').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const card = btn.closest('.pattern-card');
+    const hidden = card.querySelectorAll('.example-quote.collapsed');
+    const isExpanding = hidden.length > 0;
+    hidden.forEach(function(q) { q.classList.remove('collapsed'); });
+    if (!isExpanding) {
+      card.querySelectorAll('.example-quote').forEach(function(q, idx) {
+        if (idx >= 2) q.classList.add('collapsed');
+      });
+    }
+    btn.textContent = isExpanding ? 'Show less' : 'Show ' + (card.querySelectorAll('.example-quote').length - 2) + ' more';
+  });
+});
+</script>
+
+<style>
+.patterns-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.patterns-header .btn-primary {
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--link);
+  color: white;
+  font-weight: 500;
+}
+
+.patterns-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.summary-number {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-body);
+  line-height: 1.2;
+}
+
+.summary-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.empty-state h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.empty-state .btn-secondary {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.pattern-section {
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-body);
+}
+
+.section-count {
+  padding: 0.2rem 0.6rem;
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.pattern-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.pattern-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.pattern-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-body);
+}
+
+.confidence-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 60px;
+}
+
+.confidence-bar {
+  width: 50px;
+  height: 5px;
+  background: var(--surface-sunken);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: var(--pos);
+  border-radius: 3px;
+}
+
+.confidence-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pos);
+}
+
+.pattern-description {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 0.875rem;
+  font-size: 0.9rem;
+}
+
+.pattern-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--surface-sunken);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.stat-chip-value {
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.stat-chip-label {
+  color: var(--text-muted);
+}
+
+.pattern-examples {
+  margin-bottom: 1rem;
+}
+
+.pattern-examples h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.example-quote {
+  margin: 0 0 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-sunken);
+  border-left: 3px solid var(--link);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.85rem;
+  color: var(--text-body);
+}
+
+.example-quote.collapsed {
+  display: none;
+}
+
+.example-quote p {
+  margin: 0 0 0.35rem;
+  line-height: 1.5;
+}
+
+.example-link {
+  font-size: 0.75rem;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.example-link:hover {
+  text-decoration: underline;
+}
+
+.toggle-examples {
+  background: transparent;
+  border: none;
+  color: var(--link);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.generate-btn {
+  margin-top: auto;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.generate-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.generate-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0,0,0,0.1);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.3rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .pattern-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pattern-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>
 
 {% endblock %}

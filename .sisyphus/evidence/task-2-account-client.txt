@@ -1,0 +1,13 @@
+Task 2: Account-scoped client/config — verification evidence
+
+Verification:
+- pytest tests/test_reply_workflow.py -v => 2 passed
+  - test_publish_and_reply_use_account_scoped_credentials PASSED
+  - test_expired_account_a_token_does_not_affect_account_b PASSED
+- ruff check src/threads_analytics/config.py src/threads_analytics/threads_client.py src/threads_analytics/publisher.py src/threads_analytics/leads.py tests/test_reply_workflow.py => All checks passed
+
+Code changes verified:
+- config.py: added get_threads_credentials(account) helper with fallback to global settings
+- threads_client.py: added from_account(account), quota_scope_for_account(), refresh_long_lived_token_for_account(), create_reply(reply_to_id, text)
+- publisher.py: publish_post() accepts account parameter; publish_scheduled_idea() resolves idea account
+- leads.py: send_reply() uses ThreadsClient.from_account(account) and create_reply() official container->publish flow

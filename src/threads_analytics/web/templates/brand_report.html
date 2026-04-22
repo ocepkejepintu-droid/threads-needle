@@ -24,45 +24,20 @@
       <p class="muted small">Based on {{ report.posts_analyzed }} posts this week</p>
     </section>
 
-    <section class="span-2 card">
-      <h2>Pass Rate</h2>
-      <div class="pass-rate-display">
-        {% set total = report.passed + report.failed %}
-        {% if total > 0 %}
-          {% set pass_rate = (report.passed / total * 100) | int %}
-          <span class="pass-rate-value {% if pass_rate >= 70 %}score-good{% elif pass_rate >= 50 %}score-warning{% else %}score-bad{% endif %}">
-            {{ pass_rate }}%
-          </span>
-          <div class="pass-rate-bar">
-            <div class="pass-rate-fill" style="width: {{ pass_rate }}%"></div>
-          </div>
-          <p class="muted small">{{ report.passed }} passed, {{ report.failed }} failed</p>
-        {% else %}
-          <span class="pass-rate-value">—</span>
-          <p class="muted small">No posts analyzed</p>
-        {% endif %}
-      </div>
-    </section>
-
-    <!-- Score Trend -->
-    <section class="span-4 card">
-      <h2>Score Trend (7 Days)</h2>
-      <div class="trend-chart" role="img" aria-label="Daily brand score trend">
-        {% for score in report.score_trend %}
-          <div class="trend-bar-wrapper" title="{{ score }}/100">
-            <div class="trend-bar {% if score >= 70 %}trend-good{% elif score >= 60 %}trend-warning{% else %}trend-bad{% endif %}" 
-                 style="height: {{ score }}%"
-                 data-score="{{ score }}"></div>
-          </div>
+    {% if drift_alerts %}
+    <section class="span-4 card alerts-card">
+      <h2>Drift Alerts</h2>
+      <div class="alerts-list">
+        {% for alert in drift_alerts %}
+        <div class="alert-item alert-{{ alert.severity }}">
+          <div class="alert-badge">{{ alert.severity|upper }}</div>
+          <div class="alert-message">{{ alert.message }}</div>
+        </div>
         {% endfor %}
       </div>
-      <div class="trend-labels">
-        <span class="muted small">7 days ago</span>
-        <span class="muted small">Today</span>
-      </div>
     </section>
+    {% endif %}
 
-    <!-- Top Violations -->
     <section class="span-2 card">
       <h2>Top Violations</h2>
       {% if report.top_violations %}
@@ -72,9 +47,13 @@
               <span class="violation-type">{{ v.type }}</span>
               <span class="violation-count">{{ v.count }}×</span>
             </div>
-          {% endfor %n        </div>
+          {% endfor %}
+        </div>
       {% else %}
-        <p class="muted small">No violations detected this week. Great job!</p>
+        <div class="empty-state">
+          <div class="empty-icon">✓</div>
+          <p class="muted small">No violations detected this week. Great job!</p>
+        </div>
       {% endif %}
     </section>
 
@@ -88,14 +67,30 @@
           {% endfor %}
         </ul>
       {% else %}
-        <p class="muted small">No recommendations at this time.</p>
+        <div class="empty-state">
+          <div class="empty-icon">★</div>
+          <p class="muted small">No recommendations at this time. Keep doing what works.</p>
+        </div>
       {% endif %}
+    </section>
+
+    <section class="span-4 card actions-bar">
+      <a href="{{ account_path_prefix }}/compose" class="btn btn-primary">Open Brand Composer</a>
+      <a href="{{ account_path_prefix }}/you" class="btn btn-secondary">Edit Voice Profile</a>
     </section>
 
   </div>
 
 {% else %}
-  <p class="muted">No brand health data available. Run the pipeline to generate your first report.</p>
+  <div class="empty-state-large">
+    <div class="empty-icon-large">📊</div>
+    <h2>No brand health data available</h2>
+    <p class="muted">Run the pipeline to generate your first report, or start writing in the Brand Composer.</p>
+    <div class="empty-actions">
+      <a href="{{ account_path_prefix }}/compose" class="btn btn-primary">Open Brand Composer</a>
+      <a href="{{ account_path_prefix }}/you" class="btn btn-secondary">Set Up Voice Profile</a>
+    </div>
+  </div>
 {% endif %}
 
 <style>
@@ -230,6 +225,152 @@
 
 .recommendations-list li::marker {
   color: var(--accent);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.empty-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  font-size: 1.25rem;
+}
+
+.empty-state-large {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 1rem;
+}
+
+.empty-icon-large {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actions-bar .btn {
+  text-decoration: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.actions-bar .btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.actions-bar .btn-secondary {
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.alerts-card {
+  background: var(--surface);
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  border-left: 4px solid var(--text-muted);
+}
+
+.alert-item.alert-warning {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.alert-item.alert-critical {
+  border-left-color: var(--neg);
+  background: var(--neg-bg);
+}
+
+.alert-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: var(--text-muted);
+  color: var(--surface);
+}
+
+.alert-warning .alert-badge {
+  background: var(--warn);
+  color: var(--text-body);
+}
+
+.alert-critical .alert-badge {
+  background: var(--neg);
+  color: white;
+}
+
+.alert-message {
+  font-size: 0.9rem;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.trend-bar-wrapper:hover .trend-bar {
+  filter: brightness(1.15);
+}
+
+.trend-bar-wrapper::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--surface);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  margin-bottom: 0.25rem;
+}
+
+.trend-bar-wrapper:hover::after {
+  opacity: 1;
 }
 </style>
 

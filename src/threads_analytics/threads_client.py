@@ -7,13 +7,14 @@ so the rest of the codebase deals in plain dataclasses.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any
 
 import httpx
 
-from .config import get_settings
+from .config import get_threads_credentials
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +23,8 @@ GRAPH_BASE = "https://graph.threads.net/v1.0"
 POST_FIELDS = (
     "id,media_product_type,media_type,media_url,text,permalink,timestamp,username,is_quote_post"
 )
-REPLY_FIELDS = (
-    "id,media_product_type,media_type,text,permalink,timestamp,username,root_post"
-)
+REPLY_FIELDS = "id,media_product_type,media_type,text,permalink,timestamp,username,root_post"
+POST_COMMENT_FIELDS = "id,text,username,user_id,permalink,timestamp"
 POST_INSIGHT_METRICS = "views,likes,replies,reposts,quotes"
 # Account insights are split across two metric groups by Meta:
 #   - "lifetime" metrics (no period parameter): followers_count, follower_demographics
@@ -54,6 +54,16 @@ class ThreadsReply:
     permalink: str | None
     created_at: datetime
     root_post_id: str | None = None
+
+
+@dataclass
+class PostComment:
+    id: str
+    text: str
+    username: str | None
+    user_id: str | None
+    permalink: str | None
+    created_at: datetime
 
 
 @dataclass
@@ -103,16 +113,33 @@ def _parse_ts(s: str | None) -> datetime:
 
 class ThreadsClient:
     def __init__(self, access_token: str | None = None, user_id: str | None = None):
-        settings = get_settings()
-        self.access_token = access_token or settings.threads_access_token
-        self.user_id = user_id or settings.threads_user_id
+        credentials = get_threads_credentials()
+        self.access_token = access_token or credentials.access_token
+        self.user_id = user_id or credentials.user_id
         self._client = httpx.Client(timeout=30.0)
         self.rate_limit_state = RateLimitState()
 
         if not self.access_token:
-            raise RuntimeError(
-                "THREADS_ACCESS_TOKEN is not set. Run scripts/setup_token.py first."
-            )
+            raise RuntimeError("THREADS_ACCESS_TOKEN is not set. Run scripts/setup_token.py first.")
+
+    @classmethod
+    def from_account(cls, account: object | None) -> "ThreadsClient":
+        credentials = get_threads_credentials(account)
+        return cls(access_token=credentials.access_token, user_id=credentials.user_id)
+
+    @staticmethod
+    def quota_scope_for_account(account: object | None) -> str:
+        if account is None:
+            return "account:default"
+        slug = getattr(account, "slug", None)
+        account_id = getattr(account, "id", None)
+        identifier = slug or account_id or "default"
+        return f"account:{identifier}"
+
+    @classmethod
+    def refresh_long_lived_token_for_account(cls, account: object | None) -> str:
+        with cls.from_account(account) as client:
+            return client.refresh_long_lived_token()
 
     # ---------- HTTP ----------
 
@@ -145,7 +172,7 @@ class ThreadsClient:
             params={"fields": "id,username,threads_profile_picture_url,threads_biography"},
         )
 
-    def list_my_posts(self, limit: int = 100) -> list[ThreadsPost]:
+    def list_my_posts(self, limit: int | None = 100) -> list[ThreadsPost]:
         """Fetch recent own posts, paginated via Meta's `paging.next` URLs
         until `limit` is reached or Meta stops returning pages.
 
@@ -156,7 +183,7 @@ class ThreadsClient:
         """
         out: list[ThreadsPost] = []
 
-        def _parse_item(item: dict) -> ThreadsPost:
+        def _parse_item(item: dict[str, Any]) -> ThreadsPost:
             return ThreadsPost(
                 id=item["id"],
                 text=item.get("text", "") or "",
@@ -167,19 +194,22 @@ class ThreadsClient:
                 username=item.get("username"),
             )
 
+        page_limit = min(limit, 100) if limit is not None else 100
         # First page — go through _get so we build the URL + inject access_token
         first_data = self._get(
             f"/{self.user_id or 'me'}/threads",
-            params={"fields": POST_FIELDS, "limit": min(limit, 100)},
+            params={"fields": POST_FIELDS, "limit": page_limit},
         )
         for item in first_data.get("data", []):
             out.append(_parse_item(item))
-            if len(out) >= limit:
+            if limit is not None and len(out) >= limit:
                 return out
         next_url = first_data.get("paging", {}).get("next")
 
         # Subsequent pages — raw httpx call on the full next_url, NO params arg
-        while next_url and len(out) < limit:
+        max_pages = 1000  # Safety guard against infinite loops
+        pages_fetched = 0
+        while next_url and (limit is None or len(out) < limit) and pages_fetched < max_pages:
             resp = self._client.get(next_url)
             if resp.status_code >= 400:
                 log.error("Threads API error %s on pagination: %s", resp.status_code, resp.text)
@@ -190,9 +220,14 @@ class ThreadsClient:
                 break
             for item in items:
                 out.append(_parse_item(item))
-                if len(out) >= limit:
+                if limit is not None and len(out) >= limit:
                     return out
             next_url = data.get("paging", {}).get("next")
+            pages_fetched += 1
+        if pages_fetched >= max_pages:
+            log.warning(
+                "list_my_posts: reached max page limit (%s), returning partial results", max_pages
+            )
         return out
 
     def list_my_replies(self, limit: int = 25) -> list[ThreadsReply]:
@@ -223,6 +258,63 @@ class ThreadsClient:
                 break
         return out
 
+    def list_post_replies(self, post_thread_id: str, limit: int | None = 25) -> list[PostComment]:
+        """Fetch top-level replies on a specific post. Best-effort — returns
+        an empty list if the endpoint isn't available or errors out."""
+        out: list[PostComment] = []
+        page_limit = limit if limit is not None else 100
+        params: dict[str, Any] = {"fields": POST_COMMENT_FIELDS, "limit": page_limit}
+        try:
+            data = self._get(f"/{post_thread_id}/replies", params=params)
+        except httpx.HTTPError as exc:
+            log.warning("list_post_replies failed for %s: %s", post_thread_id, exc)
+            return out
+        for item in data.get("data", []):
+            out.append(
+                PostComment(
+                    id=item["id"],
+                    text=item.get("text", "") or "",
+                    username=item.get("username"),
+                    user_id=item.get("user_id"),
+                    permalink=item.get("permalink"),
+                    created_at=_parse_ts(item.get("timestamp")),
+                )
+            )
+            if limit is not None and len(out) >= limit:
+                return out
+        next_url = data.get("paging", {}).get("next")
+        max_pages = 1000  # Safety guard against infinite loops
+        pages_fetched = 0
+        while next_url and (limit is None or len(out) < limit) and pages_fetched < max_pages:
+            resp = self._client.get(next_url)
+            if resp.status_code >= 400:
+                log.warning(
+                    "list_post_replies pagination failed for %s: %s", post_thread_id, resp.text
+                )
+                break
+            page = resp.json()
+            for item in page.get("data", []):
+                out.append(
+                    PostComment(
+                        id=item["id"],
+                        text=item.get("text", "") or "",
+                        username=item.get("username"),
+                        user_id=item.get("user_id"),
+                        permalink=item.get("permalink"),
+                        created_at=_parse_ts(item.get("timestamp")),
+                    )
+                )
+                if limit is not None and len(out) >= limit:
+                    return out
+            next_url = page.get("paging", {}).get("next")
+            pages_fetched += 1
+        if pages_fetched >= max_pages:
+            log.warning(
+                "list_post_replies: reached max page limit (%s), returning partial results",
+                max_pages,
+            )
+        return out
+
     def get_post_insights(self, thread_id: str) -> ThreadsPostInsight:
         data = self._get(f"/{thread_id}/insights", params={"metric": POST_INSIGHT_METRICS})
         metrics = _metrics_to_dict(data.get("data", []))
@@ -242,7 +334,6 @@ class ThreadsClient:
         period metrics. We call each group separately and swallow failures on
         the non-critical ones so a partial result is still returned.
         """
-        import time
         from datetime import datetime, timedelta, timezone
 
         base = f"/{self.user_id or 'me'}/threads_insights"
@@ -360,6 +451,98 @@ class ThreadsClient:
         self.access_token = new_token
         return new_token
 
+    def create_text_post(self, text: str, image_url: str | None = None) -> dict[str, Any]:
+        """Create a text-only or image post on Threads.
+
+        Args:
+            text: Post content
+            image_url: Optional URL of image to attach
+
+        Returns:
+            API response with post ID
+        """
+        import time
+
+        user_id = self.user_id or "me"
+
+        if image_url:
+            # Image post
+            create_params = {
+                "media_type": "IMAGE",
+                "text": text,
+                "image_url": image_url,
+            }
+        else:
+            # Text-only post
+            create_params = {
+                "media_type": "TEXT",
+                "text": text,
+            }
+
+        # Step 1: Create the media container
+        container = self._post(
+            f"/{user_id}/threads",
+            params=create_params,
+        )
+
+        creation_id = container.get("id")
+        if not creation_id:
+            raise RuntimeError(f"No creation ID in response: {container}")
+
+        # Step 2: Poll container readiness (especially important for image posts)
+        max_retries = 10 if image_url else 3
+        for attempt in range(max_retries):
+            status_data = self._get(
+                f"/{creation_id}",
+                params={"fields": "status,error_message"},
+            )
+            status = status_data.get("status", "FINISHED")
+            if status == "FINISHED":
+                break
+            if status == "ERROR":
+                error_msg = status_data.get("error_message", "unknown error")
+                raise RuntimeError(f"Media container failed: {error_msg}")
+            time.sleep(min(2 + attempt, 5))
+        else:
+            raise RuntimeError("Media container did not become ready in time")
+
+        # Step 3: Publish the container
+        publish_params = {
+            "creation_id": creation_id,
+        }
+
+        result = self._post(
+            f"/{user_id}/threads_publish",
+            params=publish_params,
+        )
+
+        result["creation_id"] = creation_id
+        return result
+
+    def create_reply(self, reply_to_id: str, text: str) -> dict[str, Any]:
+        """Create and publish a reply via the official container -> publish flow."""
+        user_id = self.user_id or "me"
+
+        container = self._post(
+            f"/{user_id}/threads",
+            params={
+                "media_type": "TEXT",
+                "text": text,
+                "reply_to_id": reply_to_id,
+            },
+        )
+
+        creation_id = container.get("id")
+        if not creation_id:
+            raise RuntimeError(f"No creation ID in response: {container}")
+
+        result = self._post(
+            f"/{user_id}/threads_publish",
+            params={"creation_id": creation_id},
+        )
+        result["creation_id"] = creation_id
+        return result
+
     def close(self) -> None:
         self._client.close()
 
@@ -375,6 +558,8 @@ def _metrics_to_dict(metric_list: Iterable[dict[str, Any]]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for m in metric_list:
         name = m.get("name")
+        if not isinstance(name, str):
+            continue
         values = m.get("values") or m.get("total_value") or []
         if isinstance(values, dict):
             out[name] = values.get("value")

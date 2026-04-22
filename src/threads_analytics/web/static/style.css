@@ -324,6 +324,20 @@ button { font-family: var(--font); }
   animation: run-spin 700ms linear infinite;
 }
 @keyframes run-spin { to { transform: rotate(360deg); } }
+.run-progress {
+  width: 160px;
+  height: 4px;
+  background: var(--surface-sunken);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.run-progress-fill {
+  height: 100%;
+  background: var(--text);
+  border-radius: 2px;
+  transition: width 300ms var(--ease);
+}
 
 /* ---------- card primitive ---------- */
 .card {

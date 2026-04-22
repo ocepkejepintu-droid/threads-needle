@@ -1,0 +1,20 @@
+Task 1 tenancy errors encountered and resolved
+=============================================
+
+1) Initial test invocation used the system Python path:
+   - `pytest tests/test_multi_account_isolation.py -q`
+   - `pytest tests/test_web_routes.py -q`
+   Result: ModuleNotFoundError for `threads_analytics`.
+   Resolution: re-ran with project venv (`.venv/bin/python -m pytest ...`).
+
+2) Initial lint invocation used a missing global binary:
+   - `ruff check .`
+   Result: `zsh:1: command not found: ruff`.
+   Resolution: re-ran with `.venv/bin/ruff check .`.
+
+3) LSP diagnostics tool was unavailable in this environment:
+   - `lsp_diagnostics` reported `basedpyright-langserver` not installed.
+   Resolution: used passing targeted pytest runs plus clean `ruff check .` as available verification evidence.
+
+4) Pre-existing Ruff violations blocked final verification.
+   Resolution: applied Ruff auto-fixes and manually fixed remaining issues, then re-ran `ruff check .` successfully.

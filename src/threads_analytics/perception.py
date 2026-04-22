@@ -91,9 +91,10 @@ DO NOT exceed word limits. If you run out of words, stop mid-thought."""
 
 def generate_public_perception(run: Run) -> int | None:
     settings = get_settings()
+    account_id = run.account_id
 
     with session_scope() as session:
-        profile = session.scalar(select(Profile).limit(1))
+        profile = session.scalar(select(Profile).where(Profile.account_id == account_id).limit(1))
         profile_payload = None
         if profile is not None:
             profile_payload = {
@@ -103,7 +104,10 @@ def generate_public_perception(run: Run) -> int | None:
             }
 
         posts = session.scalars(
-            select(MyPost).order_by(desc(MyPost.created_at)).limit(10)
+            select(MyPost)
+            .where(MyPost.account_id == account_id)
+            .order_by(desc(MyPost.created_at))
+            .limit(10)
         ).all()
         post_payload = [
             {
@@ -115,29 +119,28 @@ def generate_public_perception(run: Run) -> int | None:
 
         image_posts = session.scalars(
             select(MyPost)
-            .where(MyPost.media_url.is_not(None))
+            .where(MyPost.account_id == account_id, MyPost.media_url.is_not(None))
             .order_by(desc(MyPost.created_at))
             .limit(5)
         ).all()
         image_urls = [p.media_url for p in image_posts if p.media_url]
 
         replies = session.scalars(
-            select(MyReply).order_by(desc(MyReply.created_at)).limit(5)
+            select(MyReply)
+            .where(MyReply.account_id == account_id)
+            .order_by(desc(MyReply.created_at))
+            .limit(5)
         ).all()
         reply_payload = [{"text": (r.text or "")[:400]} for r in replies]
 
-    text_body = (
-        f"{SCHEMA_INSTRUCTION}\n\n"
-        "DATA:\n"
-        + json.dumps(
-            {
-                "profile": profile_payload,
-                "recent_posts": post_payload,
-                "recent_replies": reply_payload,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
+    text_body = f"{SCHEMA_INSTRUCTION}\n\nDATA:\n" + json.dumps(
+        {
+            "profile": profile_payload,
+            "recent_posts": post_payload,
+            "recent_replies": reply_payload,
+        },
+        ensure_ascii=False,
+        indent=2,
     )
 
     content: list[dict] = [{"type": "text", "text": text_body}]
@@ -149,7 +152,7 @@ def generate_public_perception(run: Run) -> int | None:
     except ValueError as e:
         log.warning("LLM client not configured: %s", e)
         return None
-    
+
     # Select model based on provider
     if settings.llm_provider == "anthropic":
         model = settings.claude_recommender_model
@@ -157,7 +160,7 @@ def generate_public_perception(run: Run) -> int | None:
         model = settings.openrouter_model
     else:
         model = settings.zai_model
-    
+
     try:
         resp = client.create_message(
             model=model,
@@ -189,16 +192,12 @@ def generate_public_perception(run: Run) -> int | None:
     with session_scope() as session:
         existing = session.get(PublicPerception, run.id)
         if existing is None:
-            existing = PublicPerception(run_id=run.id)
+            existing = PublicPerception(account_id=account_id, run_id=run.id)
             session.add(existing)
         # Map v3 → legacy fields for backward compat
         existing.one_sentence_cold = data.get("thinSliceJudgment", "")
-        existing.first_impression = (
-            (data.get("profileSignalQuality") or {}).get("summary") or ""
-        )
-        existing.positioning_clarity = (
-            (data.get("cueClarity") or {}).get("explanation") or ""
-        )
+        existing.first_impression = (data.get("profileSignalQuality") or {}).get("summary") or ""
+        existing.positioning_clarity = (data.get("cueClarity") or {}).get("explanation") or ""
         existing.stickiness = ""
         existing.conversation_readiness = ""
         existing.follow_triggers = data.get("followTriggers") or []

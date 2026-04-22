@@ -1,0 +1,30 @@
+Task 1 tenancy evidence
+======================
+
+Changed areas
+- src/threads_analytics/models.py
+- src/threads_analytics/account_scope.py
+- src/threads_analytics/db.py
+- alembic/versions/1b7f6a2d4c3e_add_accounts_multi_tenancy.py
+- tests/fixtures_accounts.py
+- tests/test_multi_account_isolation.py
+- tests/test_web_routes.py
+
+Verification commands
+---------------------
+$ .venv/bin/python -m pytest tests/test_multi_account_isolation.py -q
+..                                                                       [100%]
+2 passed in 0.32s
+
+$ .venv/bin/python -m pytest tests/test_web_routes.py -q
+........                                                                 [100%]
+8 passed in 2.06s
+
+$ .venv/bin/ruff check .
+All checks passed!
+
+Notes
+-----
+- Shared DB tenancy foundation added with Account model and required account_id foreign keys.
+- Default account bootstrap added in init_db() for compatibility with create_all()-based setups.
+- Alembic migration adds accounts table, backfills existing rows to default account, and enforces NOT NULL account_id columns.

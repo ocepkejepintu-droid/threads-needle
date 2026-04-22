@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from typing import ClassVar
 
 from sqlalchemy import (
     JSON,
@@ -26,6 +27,21 @@ class Base(DeclarativeBase):
     pass
 
 
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(128), unique=True)
+    name: Mapped[str] = mapped_column(String(256))
+    threads_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    threads_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    threads_handle: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    enabled_capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    soft_caps: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
 class Profile(Base):
     """Snapshot of the user's Threads profile — name, bio, picture.
 
@@ -34,6 +50,7 @@ class Profile(Base):
 
     __tablename__ = "profiles"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     username: Mapped[str] = mapped_column(String(128))
     biography: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -45,11 +62,13 @@ class Run(Base):
     __tablename__ = "runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="running")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     keyword_search_queries_used: Mapped[int] = mapped_column(Integer, default=0)
+    stage_progress: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
     account_insights: Mapped[MyAccountInsight | None] = relationship(
         back_populates="run", uselist=False
@@ -60,6 +79,7 @@ class Run(Base):
 class MyPost(Base):
     __tablename__ = "my_posts"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     thread_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     text: Mapped[str] = mapped_column(Text, default="")
     media_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -76,6 +96,7 @@ class MyReply(Base):
 
     __tablename__ = "my_replies"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     thread_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     text: Mapped[str] = mapped_column(Text, default="")
     media_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -90,6 +111,7 @@ class MyPostInsight(Base):
     __table_args__ = (UniqueConstraint("thread_id", "run_id", name="uq_post_run"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     thread_id: Mapped[str] = mapped_column(ForeignKey("my_posts.thread_id"))
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"))
     views: Mapped[int] = mapped_column(Integer, default=0)
@@ -105,6 +127,7 @@ class MyPostInsight(Base):
 class MyAccountInsight(Base):
     __tablename__ = "my_account_insights"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), primary_key=True)
     follower_count: Mapped[int] = mapped_column(Integer, default=0)
     views: Mapped[int] = mapped_column(Integer, default=0)
@@ -112,7 +135,8 @@ class MyAccountInsight(Base):
     replies: Mapped[int] = mapped_column(Integer, default=0)
     reposts: Mapped[int] = mapped_column(Integer, default=0)
     quotes: Mapped[int] = mapped_column(Integer, default=0)
-    demographics_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    profile_clicks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    demographics_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     run: Mapped[Run] = relationship(back_populates="account_insights")
@@ -122,7 +146,8 @@ class Topic(Base):
     __tablename__ = "topics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    label: Mapped[str] = mapped_column(String(128), unique=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    label: Mapped[str] = mapped_column(String(128))
     description: Mapped[str] = mapped_column(Text, default="")
     extracted_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     last_searched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -131,6 +156,7 @@ class Topic(Base):
 class PostTopic(Base):
     __tablename__ = "post_topics"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     post_thread_id: Mapped[str] = mapped_column(ForeignKey("my_posts.thread_id"), primary_key=True)
     topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id"), primary_key=True)
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
@@ -140,7 +166,8 @@ class AffinityCreator(Base):
     __tablename__ = "affinity_creators"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    handle: Mapped[str] = mapped_column(String(128), unique=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    handle: Mapped[str] = mapped_column(String(128))
     user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     discovered_via_topic_id: Mapped[int | None] = mapped_column(
         ForeignKey("topics.id"), nullable=True
@@ -155,6 +182,7 @@ class AffinityCreator(Base):
 class AffinityPost(Base):
     __tablename__ = "affinity_posts"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     thread_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     creator_id: Mapped[int] = mapped_column(ForeignKey("affinity_creators.id"))
     text: Mapped[str] = mapped_column(Text, default="")
@@ -172,12 +200,13 @@ class Recommendation(Base):
     __tablename__ = "recommendations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"))
     rank: Mapped[int] = mapped_column(Integer, default=0)
     category: Mapped[str] = mapped_column(String(64))
     title: Mapped[str] = mapped_column(String(256))
     body: Mapped[str] = mapped_column(Text)
-    evidence_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    evidence_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|applied|dismissed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
@@ -195,6 +224,7 @@ class PublicPerception(Base):
 
     __tablename__ = "public_perceptions"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), primary_key=True)
 
     # v2 growth-focused fields
@@ -202,10 +232,16 @@ class PublicPerception(Base):
     first_impression: Mapped[str] = mapped_column(Text, default="")
     positioning_clarity: Mapped[str] = mapped_column(Text, default="")
     stickiness: Mapped[str] = mapped_column(Text, default="")
-    follow_triggers: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # list[str]
-    bounce_reasons: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # list[str]
+    follow_triggers: Mapped[dict[str, object] | None] = mapped_column(
+        JSON, nullable=True
+    )  # list[str]
+    bounce_reasons: Mapped[dict[str, object] | None] = mapped_column(
+        JSON, nullable=True
+    )  # list[str]
     conversation_readiness: Mapped[str] = mapped_column(Text, default="")
-    growth_blockers: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # list[str]
+    growth_blockers: Mapped[dict[str, object] | None] = mapped_column(
+        JSON, nullable=True
+    )  # list[str]
 
     # Legacy v1 fields (kept nullable so historical rows still render)
     first_glance: Mapped[str] = mapped_column(Text, default="")
@@ -217,7 +253,7 @@ class PublicPerception(Base):
     who_will_like: Mapped[str] = mapped_column(Text, default="")
     who_will_dislike: Mapped[str] = mapped_column(Text, default="")
 
-    raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -234,30 +270,31 @@ class AlgorithmInference(Base):
 
     __tablename__ = "algorithm_inferences"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), primary_key=True)
 
     # v1 fields (kept for backward compat)
     summary: Mapped[str] = mapped_column(Text, default="")
-    penalties: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    boosts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    signal_profile: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    levers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    penalties: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    boosts: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    signal_profile: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    levers: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
     # v2 research-grounded fields
     narrative_diagnosis: Mapped[str] = mapped_column(Text, default="")
-    reply_velocity_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reply_velocity_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # {rating: penalized|neutral|boosted, evidence: str, inferred_impact: str}
-    conversation_depth_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    self_reply_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    zero_reply_penalty_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    format_diversity_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    posting_cadence_signal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    highest_roi_lever: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    conversation_depth_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    self_reply_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    zero_reply_penalty_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    format_diversity_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    posting_cadence_signal: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    highest_roi_lever: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # {title, mechanism, expected_impact, cites_research: "X heavy ranker +75 weight…"}
-    inferred_signal_weights: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    inferred_signal_weights: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # {reply_velocity: 0.0-1.0, conversation_depth: ..., ...} — Claude's guess
 
-    raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -271,24 +308,27 @@ class YouProfile(Base):
 
     __tablename__ = "you_profiles"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), primary_key=True)
     core_identity: Mapped[str] = mapped_column(Text, default="")
     # One-paragraph "this person in their own frame, not the algo's"
-    distinctive_voice_traits: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    distinctive_voice_traits: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of {trait, evidence, example}
-    unique_topic_crossovers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    unique_topic_crossovers: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of {topic, why_unusual, example}
-    stylistic_signatures: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    stylistic_signatures: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of {signature, evidence}
-    posts_that_sound_most_like_you: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    posts_that_sound_most_like_you: Mapped[dict[str, object] | None] = mapped_column(
+        JSON, nullable=True
+    )
     # list of {post_id, text, why}
-    protect_list: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    protect_list: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of strings — things to NEVER optimize away
-    double_down_list: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    double_down_list: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of strings — things to make MORE of (uniquely yours AND effective)
-    homogenization_risks: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    homogenization_risks: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     # list of {risk, if_you_do_this_you_lose}
-    raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -299,9 +339,12 @@ class NoteworthyPost(Base):
     __tablename__ = "noteworthy_posts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"))
     post_thread_id: Mapped[str] = mapped_column(ForeignKey("my_posts.thread_id"))
-    category: Mapped[str] = mapped_column(String(64))  # breakout | conversation_starter | reach_outlier | reply_velocity_win | flop | pattern_anomaly
+    category: Mapped[str] = mapped_column(
+        String(64)
+    )  # breakout | conversation_starter | reach_outlier | reply_velocity_win | flop | pattern_anomaly
     remarkable_metric: Mapped[str] = mapped_column(String(64))
     remarkable_value: Mapped[float] = mapped_column(Float)
     ratio_vs_median: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -317,12 +360,15 @@ class Experiment(Base):
     __tablename__ = "experiments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     title: Mapped[str] = mapped_column(String(256))
     hypothesis: Mapped[str] = mapped_column(Text)
-    category: Mapped[str] = mapped_column(String(32))  # TIMING|LENGTH|MEDIA|HOOK|TOPIC|CADENCE|ENGAGEMENT|CUSTOM
-    predicate_spec: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    category: Mapped[str] = mapped_column(
+        String(32)
+    )  # TIMING|LENGTH|MEDIA|HOOK|TOPIC|CADENCE|ENGAGEMENT|CUSTOM
+    predicate_spec: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     primary_metric: Mapped[str] = mapped_column(String(64))
-    secondary_metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    secondary_metrics: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
     baseline_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     baseline_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -330,8 +376,12 @@ class Experiment(Base):
     variant_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     target_delta_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    status: Mapped[str] = mapped_column(String(32), default="proposed")  # proposed|active|completed|abandoned
-    source: Mapped[str] = mapped_column(String(32), default="user_defined")  # user_defined|suggested_by_claude
+    status: Mapped[str] = mapped_column(
+        String(32), default="proposed"
+    )  # proposed|active|completed|abandoned
+    source: Mapped[str] = mapped_column(
+        String(32), default="user_defined"
+    )  # user_defined|suggested_by_claude
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
@@ -351,10 +401,9 @@ class ExperimentPostClassification(Base):
 
     __tablename__ = "experiment_post_classifications"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     experiment_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), primary_key=True)
-    post_thread_id: Mapped[str] = mapped_column(
-        ForeignKey("my_posts.thread_id"), primary_key=True
-    )
+    post_thread_id: Mapped[str] = mapped_column(ForeignKey("my_posts.thread_id"), primary_key=True)
     bucket: Mapped[str] = mapped_column(String(32))  # variant|control|outside_window
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     classified_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
@@ -367,6 +416,7 @@ class ExperimentVerdict(Base):
 
     __tablename__ = "experiment_verdicts"
 
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     experiment_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), primary_key=True)
     verdict: Mapped[str] = mapped_column(String(32))  # win|loss|null|insufficient_data
     primary_metric_baseline: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -379,7 +429,7 @@ class ExperimentVerdict(Base):
     variant_n: Mapped[int] = mapped_column(Integer, default=0)
     control_n: Mapped[int] = mapped_column(Integer, default=0)
     honest_interpretation: Mapped[str] = mapped_column(Text, default="")
-    raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     experiment: Mapped[Experiment] = relationship(back_populates="verdict")
@@ -389,6 +439,7 @@ class RecommendationOutcome(Base):
     __tablename__ = "recommendation_outcomes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     recommendation_id: Mapped[int] = mapped_column(ForeignKey("recommendations.id"))
     checked_at_run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"))
     follower_delta: Mapped[int] = mapped_column(Integer, default=0)
@@ -405,11 +456,14 @@ class LeadSource(Base):
     __tablename__ = "lead_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(default=True)
     search_frequency_hours: Mapped[int] = mapped_column(default=24)
-    last_searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_searched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -432,6 +486,7 @@ class Lead(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     source_id: Mapped[int] = mapped_column(ForeignKey("lead_sources.id"))
 
     # Thread/Post info
@@ -460,7 +515,9 @@ class Lead(Base):
 
     # AI-generated content
     ai_draft_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
-    ai_draft_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ai_draft_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Final content (editable by user)
     final_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -473,9 +530,12 @@ class Lead(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Relationship
     source: Mapped["LeadSource"] = relationship("LeadSource", back_populates="leads")
+    score: Mapped["LeadScore | None"] = relationship("LeadScore", uselist=False)
 
 
 class LeadSearchLog(Base):
@@ -484,6 +544,7 @@ class LeadSearchLog(Base):
     __tablename__ = "lead_search_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     source_id: Mapped[int] = mapped_column(ForeignKey("lead_sources.id"))
     run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
     keywords_searched: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -503,9 +564,8 @@ class LeadScore(Base):
 
     __tablename__ = "lead_scores"
 
-    lead_id: Mapped[int] = mapped_column(
-        ForeignKey("leads.id"), primary_key=True
-    )
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), primary_key=True)
 
     # Individual signal scores (0-100)
     intent_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -530,18 +590,19 @@ class ReplyTemplate(Base):
     __tablename__ = "reply_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     template_text: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    
+
     # A/B testing
     is_active: Mapped[bool] = mapped_column(default=True)
     is_winner: Mapped[bool] = mapped_column(default=False)
-    
+
     # Stats (denormalized for quick access)
     times_used: Mapped[int] = mapped_column(Integer, default=0)
     times_responded: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -558,24 +619,23 @@ class LeadReply(Base):
     __tablename__ = "lead_replies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
     lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), nullable=False)
-    
+
     # Template used (optional - replies can be custom)
-    template_id: Mapped[int | None] = mapped_column(
-        ForeignKey("reply_templates.id"), nullable=True
-    )
-    
+    template_id: Mapped[int | None] = mapped_column(ForeignKey("reply_templates.id"), nullable=True)
+
     # Reply content
     reply_text: Mapped[str] = mapped_column(Text, nullable=False)
-    
+
     # Sending status
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+
     # Response tracking
     has_response: Mapped[bool] = mapped_column(default=False)
     response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+
     # Conversion tracking
     converted_to_dm: Mapped[bool] = mapped_column(default=False)
     dm_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -583,14 +643,107 @@ class LeadReply(Base):
     call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     converted_to_client: Mapped[bool] = mapped_column(default=False)
     client_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    
+
     # Relationships
     lead: Mapped["Lead"] = relationship("Lead")
     template: Mapped["ReplyTemplate | None"] = relationship("ReplyTemplate")
+
+
+class CommentInbox(Base):
+    """Inbound comments queued for draft-review-send reply workflow."""
+
+    __tablename__ = "comment_inbox"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "comment_thread_id", name="uq_comment_inbox_account_comment"
+        ),
+    )
+
+    STATUS_DRAFTED: ClassVar[str] = "drafted"
+    STATUS_APPROVED: ClassVar[str] = "approved"
+    STATUS_SENDING: ClassVar[str] = "sending"
+    STATUS_SENT: ClassVar[str] = "sent"
+    STATUS_SEND_FAILED: ClassVar[str] = "send_failed"
+    STATUS_IGNORED: ClassVar[str] = "ignored"
+    VALID_STATUSES: ClassVar[tuple[str, ...]] = (
+        STATUS_DRAFTED,
+        STATUS_APPROVED,
+        STATUS_SENDING,
+        STATUS_SENT,
+        STATUS_SEND_FAILED,
+        STATUS_IGNORED,
+    )
+    ALLOWED_STATUS_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
+        STATUS_DRAFTED: {STATUS_APPROVED, STATUS_IGNORED},
+        STATUS_APPROVED: {STATUS_SENDING, STATUS_IGNORED},
+        STATUS_SENDING: {STATUS_SENT, STATUS_SEND_FAILED},
+        STATUS_SEND_FAILED: {STATUS_SENDING, STATUS_IGNORED},
+        STATUS_SENT: set(),
+        STATUS_IGNORED: set(),
+    }
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    source_post_thread_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_post_text: Mapped[str] = mapped_column(Text, default="")
+    source_post_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    comment_thread_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    comment_permalink: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    comment_author_username: Mapped[str] = mapped_column(String(256), nullable=False)
+    comment_author_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    comment_text: Mapped[str] = mapped_column(Text, default="")
+    comment_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(32), default=STATUS_DRAFTED)
+    ai_draft_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_draft_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    published_reply_thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_seen_run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @classmethod
+    def can_transition(cls, current_status: str, next_status: str) -> bool:
+        if current_status not in cls.ALLOWED_STATUS_TRANSITIONS:
+            return False
+        return next_status in cls.ALLOWED_STATUS_TRANSITIONS[current_status]
+
+    def can_transition_to(self, next_status: str) -> bool:
+        return self.can_transition(self.status, next_status)
+
+
+class PublishLedger(Base):
+    """Authoritative publish-attribution ledger for posts and replies."""
+
+    __tablename__ = "publish_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    source_type: Mapped[str] = mapped_column(String(32))
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    workflow_type: Mapped[str] = mapped_column(String(32))
+    approval_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    creation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    recovery_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 # =============================================================================
@@ -604,6 +757,7 @@ class ContentPattern(Base):
     __tablename__ = "content_patterns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
 
     pattern_type: Mapped[str] = mapped_column(
         String(32)
@@ -629,6 +783,7 @@ class GeneratedIdea(Base):
     __tablename__ = "generated_ideas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
 
     title: Mapped[str] = mapped_column(String(256))
     concept: Mapped[str] = mapped_column(Text, default="")
@@ -645,30 +800,148 @@ class GeneratedIdea(Base):
     )  # "draft", "approved", "scheduled", "published", "rejected"
 
     actual_post_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    actual_performance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    actual_performance: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    generated_by: Mapped[str] = mapped_column(
-        String(32), default="ai"
-    )  # "ai", "hybrid", "manual"
+    generated_by: Mapped[str] = mapped_column(String(32), default="ai")  # "ai", "hybrid", "manual"
+
+    # Scheduling fields (Content Flywheel)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Media attachment
+    image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # Experiment tracking
+    experiment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("experiments.id"), nullable=True
+    )
+    experiment: Mapped["Experiment | None"] = relationship("Experiment")
+
+    # v2 pipeline fields
+    intake_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("intake_items.id"), nullable=True
+    )
+    mechanic: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    # Rubric scores (0-100 total)
+    rubric_hook_test: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rubric_mechanic_fit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rubric_operator_standing: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rubric_trend_freshness: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rubric_reply_invitation: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rubric_voice_signature: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    @property
+    def total_score(self) -> int | None:
+        scores = [
+            self.rubric_hook_test,
+            self.rubric_mechanic_fit,
+            self.rubric_operator_standing,
+            self.rubric_trend_freshness,
+            self.rubric_reply_invitation,
+            self.rubric_voice_signature,
+        ]
+        if all(s is not None for s in scores):
+            return sum(scores)
+        return None
+
+
+class IntakeItem(Base):
+    """External trend signal discovered by daily intake fetchers."""
+
+    __tablename__ = "intake_items"
+    __table_args__ = (UniqueConstraint("account_id", "source_url", name="uq_intake_account_url"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+
+    source: Mapped[str] = mapped_column(String(32))  # hn, anthropic, openai, gemini, manual
+    source_url: Mapped[str] = mapped_column(String(2048))
+    source_title: Mapped[str] = mapped_column(String(512))
+    raw_data: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    operator_standing_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidate_mechanics: Mapped[list[str]] = mapped_column(JSON, default=list)
+    relevance: Mapped[str | None] = mapped_column(String(16), nullable=True)  # high|medium|low|skip
+    status: Mapped[str] = mapped_column(String(32), default="new")  # new|converted|archived|expired
+    converted_to_idea_id: Mapped[int | None] = mapped_column(
+        ForeignKey("generated_ideas.id"), nullable=True
+    )
+    discovered_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: _utcnow() + timedelta(days=7)
+    )
+
+    converted_idea: Mapped["GeneratedIdea | None"] = relationship(
+        "GeneratedIdea", foreign_keys="IntakeItem.converted_to_idea_id"
+    )
+
+
+class PostOutcome(Base):
+    """Snapshot of post performance ~24h after publish, used for learning loop."""
+
+    __tablename__ = "post_outcomes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    post_thread_id: Mapped[str] = mapped_column(ForeignKey("my_posts.thread_id"))
+    snapshot_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    views: Mapped[int] = mapped_column(Integer, default=0)
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    replies: Mapped[int] = mapped_column(Integer, default=0)
+    reposts: Mapped[int] = mapped_column(Integer, default=0)
+    reply_to_like_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reach_multiple: Mapped[float | None] = mapped_column(Float, nullable=True)
+    outcome_tag: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )  # breakout|healthy|stall|zero_reply
+
+
+class PipelineConfig(Base):
+    """Key-value config store for pipeline rules (tier thresholds, slot schedule, etc)."""
+
+    __tablename__ = "pipeline_config"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    value: Mapped[dict[str, object]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class PatternPerformance(Base):
     """Time-series tracking of pattern effectiveness over time."""
 
     __tablename__ = "pattern_performances"
-    __table_args__ = (
-        UniqueConstraint("pattern_id", "date", name="uq_pattern_date"),
-    )
+    __table_args__ = (UniqueConstraint("pattern_id", "date", name="uq_pattern_date"),)
 
-    pattern_id: Mapped[int] = mapped_column(
-        ForeignKey("content_patterns.id"), primary_key=True
-    )
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    pattern_id: Mapped[int] = mapped_column(ForeignKey("content_patterns.id"), primary_key=True)
     date: Mapped[date] = mapped_column(Date, primary_key=True)
 
     posts_using_pattern: Mapped[int] = mapped_column(Integer, default=0)
     avg_performance_vs_baseline: Mapped[float] = mapped_column(Float, default=0.0)
 
-    trend: Mapped[str] = mapped_column(
-        String(32), default=""
-    )  # "improving", "stable", "declining"
+    trend: Mapped[str] = mapped_column(String(32), default="")  # "improving", "stable", "declining"
+
+
+class Notification(Base):
+    """Account-scoped in-app notification / alert."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    alert_type: Mapped[str] = mapped_column(String(64))  # token_expiry, quota_exhausted, etc.
+    title: Mapped[str] = mapped_column(String(256))
+    message: Mapped[str] = mapped_column(Text, default="")
+    link_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    is_dismissed: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

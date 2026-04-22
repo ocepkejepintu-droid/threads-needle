@@ -34,15 +34,18 @@ SCHEMA_INSTRUCTION = (
 )
 
 
-def extract_and_persist_topics(min_new_posts: int = 10) -> list[Topic]:
+def extract_and_persist_topics(min_new_posts: int = 10, account_id: int | None = None) -> list[Topic]:
     """Call Claude to extract topics if there are enough new posts since last extraction."""
     settings = get_settings()
 
     with session_scope() as session:
-        posts = session.scalars(
-            select(MyPost).order_by(MyPost.created_at.desc()).limit(100)
-        ).all()
-        existing_topics = session.scalars(select(Topic)).all()
+        posts_stmt = select(MyPost).order_by(MyPost.created_at.desc()).limit(100)
+        topics_stmt = select(Topic)
+        if account_id is not None:
+            posts_stmt = posts_stmt.where(MyPost.account_id == account_id)
+            topics_stmt = topics_stmt.where(Topic.account_id == account_id)
+        posts = session.scalars(posts_stmt).all()
+        existing_topics = session.scalars(topics_stmt).all()
         existing_count = len(existing_topics)
 
         if not posts:
@@ -106,24 +109,30 @@ def extract_and_persist_topics(min_new_posts: int = 10) -> list[Topic]:
     now = datetime.now(timezone.utc)
     saved: list[Topic] = []
     with session_scope() as session:
-        # Wipe prior post_topic links for clean re-linking
-        for row in session.scalars(select(PostTopic)).all():
+        # Wipe prior post_topic links for clean re-linking (account-scoped)
+        pt_stmt = select(PostTopic)
+        if account_id is not None:
+            pt_stmt = pt_stmt.where(PostTopic.account_id == account_id)
+        for row in session.scalars(pt_stmt).all():
             session.delete(row)
 
         for t in data["topics"]:
             label = (t.get("label") or "").strip()
             if not label:
                 continue
-            topic = session.scalar(select(Topic).where(Topic.label == label))
+            topic_stmt = select(Topic).where(Topic.label == label)
+            if account_id is not None:
+                topic_stmt = topic_stmt.where(Topic.account_id == account_id)
+            topic = session.scalar(topic_stmt)
             if topic is None:
-                topic = Topic(label=label, description=t.get("description", ""))
+                topic = Topic(account_id=account_id, label=label, description=t.get("description", ""))
                 session.add(topic)
                 session.flush()
             else:
                 topic.description = t.get("description", topic.description)
                 topic.extracted_at = now
             for pid in t.get("post_ids", []) or []:
-                session.add(PostTopic(post_thread_id=pid, topic_id=topic.id, confidence=1.0))
+                session.add(PostTopic(account_id=account_id, post_thread_id=pid, topic_id=topic.id, confidence=1.0))
             saved.append(topic)
 
     log.info("extracted %d topics", len(saved))

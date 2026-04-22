@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from .db import session_scope
 from .leads import create_lead_from_post
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def run_lead_searches(run: Run, client: "ThreadsClient") -> dict:
+def run_lead_searches(run: Run, client: "ThreadsClient") -> dict[str, Any]:
     """Run lead discovery searches for all active lead sources.
 
     Iterates through active LeadSource configurations, searches for posts
@@ -50,17 +51,18 @@ def run_lead_searches(run: Run, client: "ThreadsClient") -> dict:
             "errors": [f"Failed to get user profile: {exc}"],
         }
 
-    result = {
-        "sources_searched": 0,
-        "posts_found": 0,
-        "leads_created": 0,
-        "errors": [],
-    }
+    sources_searched = 0
+    posts_found_total = 0
+    leads_created_total = 0
+    errors: list[str] = []
 
     with session_scope() as session:
         # Get all active lead sources
         sources = session.scalars(
-            select(LeadSource).where(LeadSource.is_active.is_(True))
+            select(LeadSource).where(
+                LeadSource.is_active.is_(True),
+                LeadSource.account_id == run.account_id,
+            )
         ).all()
 
         for source in sources:
@@ -72,16 +74,17 @@ def run_lead_searches(run: Run, client: "ThreadsClient") -> dict:
                     run=run,
                     your_user_id=your_user_id,
                 )
-                result["sources_searched"] += 1
-                result["posts_found"] += source_result["posts_found"]
-                result["leads_created"] += source_result["leads_created"]
+                sources_searched += 1
+                posts_found_total += source_result["posts_found"]
+                leads_created_total += source_result["leads_created"]
             except Exception as exc:
                 error_msg = f"Source '{source.name}': {exc}"
-                result["errors"].append(error_msg)
+                errors.append(error_msg)
                 log.error("Lead search failed for source %s: %s", source.name, exc)
 
                 # Still create a search log for the error
                 log_entry = LeadSearchLog(
+                    account_id=run.account_id,
                     source_id=source.id,
                     run_id=run.id,
                     keywords_searched=list(source.keywords),
@@ -91,16 +94,21 @@ def run_lead_searches(run: Run, client: "ThreadsClient") -> dict:
                 )
                 session.add(log_entry)
 
-    return result
+    return {
+        "sources_searched": sources_searched,
+        "posts_found": posts_found_total,
+        "leads_created": leads_created_total,
+        "errors": errors,
+    }
 
 
 def _search_single_source(
-    session,
+    session: Session,
     source: LeadSource,
     client: "ThreadsClient",
     run: Run,
     your_user_id: str,
-) -> dict:
+) -> dict[str, int]:
     """Search for leads from a single LeadSource.
 
     Args:
@@ -123,13 +131,15 @@ def _search_single_source(
 
             for result in results:
                 # Convert SearchResult to post dict format expected by create_lead_from_post
-                post = {
+                post: dict[str, object] = {
                     "id": result.post.id,
                     "text": result.post.text,
                     "username": result.post.username,
                     "user_id": result.author_user_id,
                     "permalink": result.post.permalink,
-                    "timestamp": result.post.created_at.isoformat() if result.post.created_at else None,
+                    "timestamp": result.post.created_at.isoformat()
+                    if result.post.created_at
+                    else None,
                     "reply_count": result.insight.replies if result.insight else 0,
                     "owner": {
                         "id": result.author_user_id,
@@ -150,7 +160,9 @@ def _search_single_source(
                     leads_created += 1
 
         except Exception as exc:
-            log.warning("Keyword search failed for '%s' in source '%s': %s", keyword, source.name, exc)
+            log.warning(
+                "Keyword search failed for '%s' in source '%s': %s", keyword, source.name, exc
+            )
             continue
 
     # Update source last searched timestamp
@@ -158,6 +170,7 @@ def _search_single_source(
 
     # Create search log entry
     log_entry = LeadSearchLog(
+        account_id=run.account_id,
         source_id=source.id,
         run_id=run.id,
         keywords_searched=list(source.keywords),

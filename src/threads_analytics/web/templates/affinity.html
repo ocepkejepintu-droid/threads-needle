@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Affinity creators</h1>
+
 {% if locked %}
   <div class="banner banner-locked">
     <strong>Locked pending Meta App Review.</strong>
@@ -8,13 +9,17 @@
     This page will populate automatically once your app is approved for advanced access — no code change needed.
   </div>
 {% endif %}
+
 <p class="muted">Creators discovered via keyword search on your topics, ranked by public engagement.</p>
+
 {% if creators %}
   <div class="creator-grid">
     {% for c in creators %}
       <div class="card creator-card">
-        <h3>@{{ c.handle }}</h3>
-        <div class="score">score: {{ c.engagement_score }}</div>
+        <div class="creator-head">
+          <h3>@{{ c.handle }}</h3>
+          <span class="creator-score">{{ c.engagement_score }}</span>
+        </div>
         <ul class="creator-posts">
           {% for p in c.top_posts %}
             <li>
@@ -27,6 +32,99 @@
     {% endfor %}
   </div>
 {% else %}
-  <p class="muted">No affinity creators discovered yet.</p>
+  <div class="empty-state card">
+    <div class="empty-icon">🌐</div>
+    <h3>No affinity creators discovered yet</h3>
+    <p class="muted">
+      {% if locked %}
+        This page requires Meta App Review for the <code>threads_keyword_search</code> permission.
+        Once approved, it will auto-populate on the next pipeline run.
+      {% else %}
+        Run the pipeline to search for creators in your topic space and see how they perform.
+      {% endif %}
+    </p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="triggerRun()" {% if locked %}disabled{% endif %}>Run pipeline now</button>
+      <a href="{{ account_path_prefix }}/topics" class="btn">View topics</a>
+    </div>
+  </div>
 {% endif %}
+
+<style>
+.creator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.creator-card {
+  padding: 18px 20px;
+  margin: 0;
+}
+.creator-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.creator-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.creator-score {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.creator-posts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.creator-posts li {
+  padding: 10px 0;
+  border-top: 1px solid var(--divider);
+}
+.creator-posts li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.empty-state {
+  text-align: center;
+  padding: 48px 28px;
+}
+.empty-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.empty-state h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.empty-state .muted {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.empty-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
 {% endblock %}

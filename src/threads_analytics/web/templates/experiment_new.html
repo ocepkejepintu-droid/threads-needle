@@ -3,7 +3,7 @@
 <h1>New experiment</h1>
 <p class="muted">Declare a hypothesis, a predicate that classifies your posts, and a primary metric. The system snapshots a baseline when you start it.</p>
 
-<form method="post" action="/experiments/new" class="exp-form card">
+<form method="post" action="{{ account_path_prefix }}/experiments/new" class="exp-form card">
   <label>Title
     <input type="text" name="title" required maxlength="80" placeholder="e.g. Post between 7–9pm only">
   </label>

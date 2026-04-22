@@ -25,7 +25,29 @@
       <div class="experiment-callout">
         <strong>{{ active_count }}</strong> active · <strong>{{ proposed_count }}</strong> proposed
       </div>
-      <a class="cta" href="/experiments/new">+ New experiment</a>
+      <a class="cta" href="{{ account_path_prefix }}/experiments/new">+ New experiment</a>
+    </div>
+  </section>
+
+  <section class="gt-quick-cell card">
+    <h2>Quick Actions</h2>
+    <div class="quick-actions">
+      <a href="{{ account_path_prefix }}/experiments/new" class="quick-action">
+        <span class="qa-icon">🧪</span>
+        <span class="qa-label">New experiment</span>
+      </a>
+      <a href="{{ account_path_prefix }}/compose" class="quick-action">
+        <span class="qa-icon">✍️</span>
+        <span class="qa-label">Compose</span>
+      </a>
+      <a href="{{ account_path_prefix }}/content" class="quick-action">
+        <span class="qa-icon">📝</span>
+        <span class="qa-label">Pipeline</span>
+      </a>
+      <a href="{{ account_path_prefix }}/comments" class="quick-action">
+        <span class="qa-icon">💬</span>
+        <span class="qa-label">Comments</span>
+      </a>
     </div>
   </section>
 
@@ -59,29 +81,95 @@
 
 <section class="card">
   <h2>Recent runs</h2>
-  <table class="runs">
-    <thead><tr><th>#</th><th>started</th><th>status</th><th>queries</th></tr></thead>
-    <tbody>
-      {% for r in runs %}
-        <tr>
-          <td>{{ r.id }}</td>
-          <td>{{ r.started_at.strftime("%Y-%m-%d %H:%M") if r.started_at else "" }}</td>
-          <td class="status-{{ r.status }}">{{ r.status }}</td>
-          <td>{{ r.queries_used }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% if runs %}
+    <table class="runs">
+      <thead><tr><th>#</th><th>started</th><th>status</th><th>queries</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.started_at.strftime("%Y-%m-%d %H:%M") if r.started_at else "" }}</td>
+            <td class="status-{{ r.status }}">{{ r.status }}</td>
+            <td>{{ r.queries_used }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state compact">
+      <p class="muted">No runs yet. Start the pipeline to ingest your posts and compute ground truth metrics.</p>
+      <button class="btn btn-primary" onclick="triggerRun()" style="margin-top:10px;">Run pipeline now</button>
+    </div>
+  {% endif %}
 </section>
+
+<style>
+.empty-state.compact {
+  text-align: center;
+  padding: 18px 0 8px;
+}
+.empty-state.compact .muted {
+  margin-bottom: 10px;
+}
+.gt-quick-cell {
+  grid-column: span 2;
+}
+.gt-quick-cell h2 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--surface-sunken);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.quick-action:hover {
+  background: var(--border);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.qa-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.qa-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-body);
+}
+@media (max-width: 960px) {
+  .gt-quick-cell { grid-column: span 2; }
+}
+</style>
 
 <script>
   const cards = {{ panel.cards | tojson }};
   const heroName = {{ panel.hero_metric_name | tojson }};
+  const posColor = getComputedStyle(document.documentElement).getPropertyValue('--pos').trim() || '#1f8a3a';
+  const negColor = getComputedStyle(document.documentElement).getPropertyValue('--neg').trim() || '#e0245e';
+  const flatColor = getComputedStyle(document.documentElement).getPropertyValue('--text-faint').trim() || '#8e8e93';
   for (const card of cards) {
     if (card.name === heroName) continue;
     const ctx = document.getElementById('spark-' + card.name);
     if (!ctx) continue;
     const data = card.sparkline.map(v => (v === null || v === undefined) ? 0 : v);
+    const borderColor = card.delta.class === 'pos' ? posColor : (card.delta.class === 'neg' ? negColor : flatColor);
     new Chart(ctx, {
       type: 'line',
       data: {
@@ -92,7 +180,7 @@
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
-          borderColor: card.delta.class === 'pos' ? '#1f8a3a' : (card.delta.class === 'neg' ? '#e0245e' : '#8e8e93'),
+          borderColor: borderColor,
         }]
       },
       options: {

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -23,7 +22,6 @@ from .experiments import create_experiment, personal_category_performance
 from .metrics import (
     METRIC_META,
     METRIC_ORDER,
-    GroundTruthPanel,
     compute_ground_truth,
 )
 from .models import (
@@ -82,39 +80,50 @@ SCHEMA_INSTRUCTION = (
     "  ]\n"
     "}\n\n"
     "predicate_spec shapes by category:\n"
-    "  TIMING: {\"hours\": [19, 20, 21]}  (hours in UTC)\n"
-    "  LENGTH: {\"min_len\": 80, \"max_len\": 200}\n"
-    "  MEDIA:  {\"media_types\": [\"IMAGE\", \"CAROUSEL_ALBUM\"]}\n"
-    "  HOOK:   {\"prefixes\": [\"you vs me\", \"hot take:\", \"nobody talks about\"]}\n"
-    "  TOPIC:  {\"topic_label\": \"<exact label from the topics list provided>\"}\n"
-    "  CADENCE: {\"min\": 1, \"max\": 2}  (posts per day)\n"
-    "  ENGAGEMENT: {\"behavior\": \"reply_to_own_commenters\", \"target_response_minutes\": 10}\n"
-    "  CUSTOM: {\"instruction\": \"plain-English instruction for the user to tag posts manually\"}\n"
+    '  TIMING: {"hours": [19, 20, 21]}  (hours in UTC)\n'
+    '  LENGTH: {"min_len": 80, "max_len": 200}\n'
+    '  MEDIA:  {"media_types": ["IMAGE", "CAROUSEL_ALBUM"]}\n'
+    '  HOOK:   {"prefixes": ["you vs me", "hot take:", "nobody talks about"]}\n'
+    '  TOPIC:  {"topic_label": "<exact label from the topics list provided>"}\n'
+    '  CADENCE: {"min": 1, "max": 2}  (posts per day)\n'
+    '  ENGAGEMENT: {"behavior": "reply_to_own_commenters", "target_response_minutes": 10}\n'
+    '  CUSTOM: {"instruction": "plain-English instruction for the user to tag posts manually"}\n'
 )
 
 
-def generate_suggestions(session: Session, n: int = 6) -> list[int]:
+def generate_suggestions(session: Session, account_id: int, n: int = 6) -> list[int]:
     """Call Claude Opus to generate experiment proposals and persist as rows.
 
     Returns the list of newly created Experiment IDs (all with status='proposed')."""
     settings = get_settings()
 
-    panel = compute_ground_truth(session)
+    panel = compute_ground_truth(session, account_id)
     perception = session.scalar(
-        select(PublicPerception).order_by(desc(PublicPerception.created_at)).limit(1)
+        select(PublicPerception)
+        .where(PublicPerception.account_id == account_id)
+        .order_by(desc(PublicPerception.created_at))
+        .limit(1)
     )
     algo = session.scalar(
-        select(AlgorithmInference).order_by(desc(AlgorithmInference.created_at)).limit(1)
+        select(AlgorithmInference)
+        .where(AlgorithmInference.account_id == account_id)
+        .order_by(desc(AlgorithmInference.created_at))
+        .limit(1)
     )
-    topics = session.scalars(select(Topic)).all()
-    track_record = personal_category_performance(session)
+    topics = session.scalars(select(Topic).where(Topic.account_id == account_id)).all()
+    track_record = personal_category_performance(session, account_id)
     you_profile = session.scalar(
-        select(YouProfile).order_by(desc(YouProfile.created_at)).limit(1)
+        select(YouProfile)
+        .where(YouProfile.account_id == account_id)
+        .order_by(desc(YouProfile.created_at))
+        .limit(1)
     )
 
     # Also fetch existing proposals the user hasn't run, so Claude can avoid duplicates
     open_proposals = session.scalars(
-        select(Experiment).where(Experiment.status == "proposed").limit(20)
+        select(Experiment)
+        .where(Experiment.account_id == account_id, Experiment.status == "proposed")
+        .limit(20)
     ).all()
     open_titles = [e.title for e in open_proposals]
 
@@ -183,7 +192,7 @@ def generate_suggestions(session: Session, n: int = 6) -> list[int]:
     except ValueError as e:
         log.warning("LLM client not configured: %s", e)
         return []
-    
+
     # Select model based on provider
     if settings.llm_provider == "anthropic":
         model = settings.claude_recommender_model
@@ -191,7 +200,7 @@ def generate_suggestions(session: Session, n: int = 6) -> list[int]:
         model = settings.openrouter_model
     else:
         model = settings.zai_model
-    
+
     try:
         resp = client.create_message(
             model=model,
@@ -224,6 +233,7 @@ def generate_suggestions(session: Session, n: int = 6) -> list[int]:
                 continue
             exp = create_experiment(
                 session,
+                account_id=account_id,
                 title=title,
                 hypothesis=item.get("hypothesis", ""),
                 category=category,

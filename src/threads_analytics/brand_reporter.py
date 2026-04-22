@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import desc, func, select
 
-from .brand_validator import BrandCheck, calculate_brand_score, check_protect_list_violations
+from .brand_validator import check_protect_list_violations
 from .models import MyPost, YouProfile
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class DriftAlert:
     details: dict = field(default_factory=dict)
 
 
-def generate_weekly_report(session: "Session") -> dict:
+def generate_weekly_report(session: "Session", account_id: int | None = None) -> dict:
     """Generate weekly brand health report.
 
     Returns:
@@ -62,19 +62,23 @@ def generate_weekly_report(session: "Session") -> dict:
     week_start = today - timedelta(days=today.weekday())  # Monday of current week
 
     # Get posts from this week
-    posts = session.scalars(
+    stmt = (
         select(MyPost)
         .where(
             func.date(MyPost.created_at) >= week_start,
             func.date(MyPost.created_at) <= week_end,
         )
         .order_by(desc(MyPost.created_at))
-    ).all()
+    )
+    if account_id is not None:
+        stmt = stmt.where(MyPost.account_id == account_id)
+    posts = session.scalars(stmt).all()
 
     # Get latest YouProfile for brand validation
-    you_profile = session.scalar(
-        select(YouProfile).order_by(desc(YouProfile.created_at)).limit(1)
-    )
+    you_stmt = select(YouProfile).order_by(desc(YouProfile.created_at))
+    if account_id is not None:
+        you_stmt = you_stmt.where(YouProfile.account_id == account_id)
+    you_profile = session.scalar(you_stmt.limit(1))
 
     # Analyze each post
     scores = []
@@ -100,7 +104,7 @@ def generate_weekly_report(session: "Session") -> dict:
                 violations[v] = violations.get(v, 0) + 1
 
     # Build daily score trend (last 7 days)
-    score_trend = _build_daily_score_trend(session, you_profile)
+    score_trend = _build_daily_score_trend(session, you_profile, account_id=account_id)
 
     # Calculate top violations
     top_violations = [
@@ -133,7 +137,7 @@ def generate_weekly_report(session: "Session") -> dict:
     }
 
 
-def detect_drift(session: "Session") -> list[dict]:
+def detect_drift(session: "Session", account_id: int | None = None) -> list[dict]:
     """Detect brand drift issues:
     - 3+ consecutive posts scoring < 70
     - Weekly average drops > 10 points
@@ -144,17 +148,21 @@ def detect_drift(session: "Session") -> list[dict]:
     alerts: list[DriftAlert] = []
 
     # Get latest YouProfile
-    you_profile = session.scalar(
-        select(YouProfile).order_by(desc(YouProfile.created_at)).limit(1)
-    )
+    you_stmt = select(YouProfile).order_by(desc(YouProfile.created_at))
+    if account_id is not None:
+        you_stmt = you_stmt.where(YouProfile.account_id == account_id)
+    you_profile = session.scalar(you_stmt.limit(1))
 
     # Get recent posts (last 30 days)
     thirty_days_ago = date.today() - timedelta(days=30)
-    posts = session.scalars(
+    stmt = (
         select(MyPost)
         .where(func.date(MyPost.created_at) >= thirty_days_ago)
         .order_by(desc(MyPost.created_at))
-    ).all()
+    )
+    if account_id is not None:
+        stmt = stmt.where(MyPost.account_id == account_id)
+    posts = session.scalars(stmt).all()
 
     if not posts:
         return []
@@ -183,7 +191,7 @@ def detect_drift(session: "Session") -> list[dict]:
             break
 
     # Check for weekly average drop > 10 points
-    weekly_scores = _get_weekly_average_scores(session, you_profile, weeks=4)
+    weekly_scores = _get_weekly_average_scores(session, you_profile, weeks=4, account_id=account_id)
     if len(weekly_scores) >= 2:
         current_week = weekly_scores[0]["avg_score"]
         prev_week = weekly_scores[1]["avg_score"]
@@ -211,10 +219,12 @@ def detect_drift(session: "Session") -> list[dict]:
                 post.text or "", you_profile.protect_list
             )
             if post_violations:
-                recent_violations.append({
-                    "post_id": post.thread_id,
-                    "violations": post_violations,
-                })
+                recent_violations.append(
+                    {
+                        "post_id": post.thread_id,
+                        "violations": post_violations,
+                    }
+                )
 
         if recent_violations:
             alerts.append(
@@ -238,28 +248,34 @@ def detect_drift(session: "Session") -> list[dict]:
     ]
 
 
-def get_brand_health_trend(session: "Session", days: int = 30) -> list[dict]:
+def get_brand_health_trend(
+    session: "Session", days: int = 30, account_id: int | None = None
+) -> list[dict]:
     """Get daily brand scores for trend chart.
 
     Returns list of daily data points:
     [{"date": "2024-01-01", "score": 85, "posts": 2}, ...]
     """
-    you_profile = session.scalar(
-        select(YouProfile).order_by(desc(YouProfile.created_at)).limit(1)
-    )
+    you_stmt = select(YouProfile).order_by(desc(YouProfile.created_at))
+    if account_id is not None:
+        you_stmt = you_stmt.where(YouProfile.account_id == account_id)
+    you_profile = session.scalar(you_stmt.limit(1))
 
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
 
     # Get posts in date range
-    posts = session.scalars(
+    stmt = (
         select(MyPost)
         .where(
             func.date(MyPost.created_at) >= start_date,
             func.date(MyPost.created_at) <= end_date,
         )
         .order_by(MyPost.created_at)
-    ).all()
+    )
+    if account_id is not None:
+        stmt = stmt.where(MyPost.account_id == account_id)
+    posts = session.scalars(stmt).all()
 
     # Group posts by date
     daily_data: dict[str, list[int]] = {}
@@ -277,11 +293,13 @@ def get_brand_health_trend(session: "Session", days: int = 30) -> list[dict]:
         current_iso = current.isoformat()
         day_scores = daily_data.get(current_iso, [])
 
-        result.append({
-            "date": current_iso,
-            "score": round(sum(day_scores) / len(day_scores), 1) if day_scores else None,
-            "posts": len(day_scores),
-        })
+        result.append(
+            {
+                "date": current_iso,
+                "score": round(sum(day_scores) / len(day_scores), 1) if day_scores else None,
+                "posts": len(day_scores),
+            }
+        )
 
     return result
 
@@ -334,7 +352,9 @@ def _analyze_post_brand_health(post: MyPost, you_profile: YouProfile | None) -> 
     return max(0, min(100, base_score))
 
 
-def _build_daily_score_trend(session: "Session", you_profile: YouProfile | None) -> list[int]:
+def _build_daily_score_trend(
+    session: "Session", you_profile: YouProfile | None, account_id: int | None = None
+) -> list[int]:
     """Build 7-day score trend.
 
     Returns list of 7 daily average scores (most recent last).
@@ -342,14 +362,17 @@ def _build_daily_score_trend(session: "Session", you_profile: YouProfile | None)
     end_date = date.today()
     start_date = end_date - timedelta(days=6)
 
-    posts = session.scalars(
+    stmt = (
         select(MyPost)
         .where(
             func.date(MyPost.created_at) >= start_date,
             func.date(MyPost.created_at) <= end_date,
         )
         .order_by(MyPost.created_at)
-    ).all()
+    )
+    if account_id is not None:
+        stmt = stmt.where(MyPost.account_id == account_id)
+    posts = session.scalars(stmt).all()
 
     # Group by date
     daily_scores: dict[date, list[int]] = {}
@@ -374,7 +397,10 @@ def _build_daily_score_trend(session: "Session", you_profile: YouProfile | None)
 
 
 def _get_weekly_average_scores(
-    session: "Session", you_profile: YouProfile | None, weeks: int = 4
+    session: "Session",
+    you_profile: YouProfile | None,
+    weeks: int = 4,
+    account_id: int | None = None,
 ) -> list[dict]:
     """Get average brand scores for the last N weeks.
 
@@ -387,13 +413,13 @@ def _get_weekly_average_scores(
         week_end = today - timedelta(weeks=week_offset, days=today.weekday())
         week_start = week_end - timedelta(days=6)
 
-        posts = session.scalars(
-            select(MyPost)
-            .where(
-                func.date(MyPost.created_at) >= week_start,
-                func.date(MyPost.created_at) <= week_end,
-            )
-        ).all()
+        stmt = select(MyPost).where(
+            func.date(MyPost.created_at) >= week_start,
+            func.date(MyPost.created_at) <= week_end,
+        )
+        if account_id is not None:
+            stmt = stmt.where(MyPost.account_id == account_id)
+        posts = session.scalars(stmt).all()
 
         if posts:
             scores = [_analyze_post_brand_health(p, you_profile) for p in posts]
@@ -401,12 +427,14 @@ def _get_weekly_average_scores(
         else:
             avg_score = 0
 
-        weekly_data.append({
-            "week_start": week_start,
-            "week_end": week_end,
-            "avg_score": round(avg_score, 1),
-            "post_count": len(posts),
-        })
+        weekly_data.append(
+            {
+                "week_start": week_start,
+                "week_end": week_end,
+                "avg_score": round(avg_score, 1),
+                "post_count": len(posts),
+            }
+        )
 
     return weekly_data
 
@@ -425,7 +453,9 @@ def _generate_recommendations(
     recommendations = []
 
     if not you_profile:
-        recommendations.append("Run the pipeline to build your You profile for better brand analysis.")
+        recommendations.append(
+            "Run the pipeline to build your You profile for better brand analysis."
+        )
         return recommendations
 
     # Score-based recommendations

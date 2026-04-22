@@ -164,7 +164,7 @@ def get_quality_tier(total_score: int) -> str:
         return "low"
 
 
-def save_lead_score(session: Session, lead: Lead, score: int, tier: str) -> LeadScore:
+def save_lead_score(session: Session, lead: Lead, score: int, tier: str, *, commit: bool = True) -> LeadScore:
     """Save a lead score to the database.
 
     Args:
@@ -172,6 +172,7 @@ def save_lead_score(session: Session, lead: Lead, score: int, tier: str) -> Lead
         lead: The Lead being scored
         score: The total calculated score
         tier: The quality tier ('high', 'medium', or 'low')
+        commit: Whether to commit immediately (set False for batching)
 
     Returns:
         The created LeadScore record
@@ -194,7 +195,8 @@ def save_lead_score(session: Session, lead: Lead, score: int, tier: str) -> Lead
     )
 
     session.add(lead_score)
-    session.commit()
+    if commit:
+        session.commit()
 
     log.debug(
         "Saved lead score for lead %s: total=%d, tier=%s",

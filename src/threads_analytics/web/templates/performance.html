@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Performance Dashboard</h1>
+  <p style="color: var(--text-muted); font-size: 0.875rem;">Rolling 30-day data</p>
+</div>
+
+<style>
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+@media (max-width: 900px) {
+  .perf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.perf-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.perf-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+.perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.perf-table th {
+  text-align: left;
+  padding: 0.5rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.perf-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.perf-table tr:last-child td {
+  border-bottom: none;
+}
+.perf-table .top-performer {
+  background: var(--pos-bg);
+}
+.perf-metric {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+}
+.perf-bar {
+  height: 6px;
+  background: var(--surface-sunken);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+.perf-bar-fill {
+  height: 100%;
+  background: var(--link);
+  border-radius: 3px;
+}
+.perf-empty {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  padding: 1rem 0;
+  text-align: center;
+}
+.perf-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.perf-compare-box {
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+.perf-compare-box .label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.perf-compare-box .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.perf-compare-box .sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  margin-top: 0.25rem;
+}
+</style>
+
+<div class="perf-grid">
+
+  <!-- Tier Hit Rate -->
+  <div class="perf-card">
+    <h2>🎯 Tier Hit Rate</h2>
+    {% if tier_hits %}
+    <table class="perf-table">
+      <tr>
+        <th>Tier</th>
+        <th>Posts</th>
+        <th>View target</th>
+        <th>Reply target</th>
+        <th>Both</th>
+      </tr>
+      {% for row in tier_hits %}
+      <tr>
+        <td><strong style="text-transform: uppercase;">{{ row.tier }}</strong></td>
+        <td>{{ row.posts }}</td>
+        <td>{{ row.hit_views }} ({{ (row.hit_views / row.posts * 100) | round(0) }}%)</td>
+        <td>{{ row.hit_replies }} ({{ (row.hit_replies / row.posts * 100) | round(0) }}%)</td>
+        <td>{{ row.hit_both }} ({{ (row.hit_both / row.posts * 100) | round(0) }}%)</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="perf-empty">No published posts with outcomes yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Mechanic Performance -->
+  <div class="perf-card">
+    <h2>⚙️ Mechanic Performance</h2>
+    {% if mechanics %}
+    <table class="perf-table">
+      <tr>
+        <th>Mechanic</th>
+        <th>Posts</th>
+        <th>Avg views</th>
+        <th>Avg replies</th>
+        <th>Breakout</th>
+      </tr>
+      {% for m in mechanics %}
+      <tr class="{% if loop.first %}top-performer{% endif %}">
+        <td>{{ m.mechanic.replace('_', ' ') | title }}</td>
+        <td>{{ m.posts }}</td>
+        <td>{{ m.avg_views }}</td>
+        <td>{{ m.avg_replies }}</td>
+        <td><span class="perf-metric">{{ m.breakout_rate }}%</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="perf-empty">No mechanic data yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Slot Performance -->
+  <div class="perf-card">
+    <h2>📅 Slot Performance</h2>
+    {% if slots %}
+    <table class="perf-table">
+      <tr>
+        <th>Slot</th>
+        <th>Posts</th>
+        <th>Avg views</th>
+        <th>Avg replies</th>
+      </tr>
+      {% for s in slots %}
+      <tr>
+        <td>{{ s.slot_label }}</td>
+        <td>{{ s.posts }}</td>
+        <td>{{ s.avg_views }}</td>
+        <td>{{ s.avg_replies }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="perf-empty">No scheduled post data yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Trend-Tie Correlation -->
+  <div class="perf-card">
+    <h2>🔗 Intake vs Manual</h2>
+    {% if trend_tie %}
+    <div class="perf-compare">
+      {% for g in trend_tie %}
+      <div class="perf-compare-box">
+        <div class="label">{{ g.group }}</div>
+        <div class="value">{{ g.posts }}</div>
+        <div class="sub">posts</div>
+        <div class="sub" style="margin-top: 0.5rem;">{{ g.avg_views }} avg views · {{ g.avg_replies }} avg replies</div>
+        <div class="sub">{{ g.breakout_rate }}% breakout</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="perf-empty">No comparison data yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Topic Clusters -->
+  <div class="perf-card" style="grid-column: 1 / -1;">
+    <h2>📚 Topic Clusters</h2>
+    {% if topics %}
+    <table class="perf-table">
+      <tr>
+        <th>Topic</th>
+        <th>Posts</th>
+        <th>Avg views</th>
+        <th>Avg replies</th>
+      </tr>
+      {% for t in topics %}
+      <tr>
+        <td>{{ t.topic }}</td>
+        <td>{{ t.posts }}</td>
+        <td>{{ t.avg_views }}</td>
+        <td>{{ t.avg_replies }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="perf-empty">No topic data yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

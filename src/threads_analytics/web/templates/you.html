@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>You</h1>
-<p class="muted">
-  The signals that are uniquely yours — the voice and quirks that would be
-  sanded away by optimizing purely for reach. The suggestion engine is told to
-  <strong>respect the protect list</strong> when proposing experiments.
-</p>
+<div class="you-header">
+  <h1>You</h1>
+  <p class="muted">
+    The signals that are uniquely yours — the voice and quirks that would be
+    sanded away by optimizing purely for reach.
+  </p>
+</div>
 
 {% if you %}
 
@@ -33,7 +34,7 @@
         <h2>Protect</h2>
         <p class="muted small">Never optimize these away.</p>
         <ul class="you-list">
-          {% for item in you.protect_list[:6] %}
+          {% for item in you.protect_list %}
             <li>{{ item }}</li>
           {% endfor %}
         </ul>
@@ -45,7 +46,7 @@
         <h2>Double down</h2>
         <p class="muted small">Uniquely yours and working.</p>
         <ul class="you-list">
-          {% for item in you.double_down_list[:6] %}
+          {% for item in you.double_down_list %}
             <li>{{ item }}</li>
           {% endfor %}
         </ul>
@@ -69,7 +70,7 @@
         <h2>Risks</h2>
         <p class="muted small">What growth tactics could cost you.</p>
         <ul class="risk-list-compact">
-          {% for r in you.homogenization_risks[:4] %}
+          {% for r in you.homogenization_risks %}
             <li>
               <strong>{{ r.risk }}</strong>
               <span class="muted">→ {{ r.if_you_do_this_you_lose }}</span>
@@ -79,9 +80,86 @@
       </section>
     {% endif %}
 
+    <section class="span-4 card actions-bar">
+      <a href="{{ account_path_prefix }}/compose" class="btn btn-primary">Open Brand Composer</a>
+      <a href="{{ account_path_prefix }}/brand-report" class="btn btn-secondary">View Brand Report</a>
+    </section>
+
   </div>
 
 {% else %}
-  <p class="muted">No 'You' profile built yet. Run the pipeline to generate one.</p>
+  <div class="empty-state-large">
+    <div class="empty-icon-large">👤</div>
+    <h2>No 'You' profile yet</h2>
+    <p class="muted">Run the pipeline to analyze your posts and build your voice profile.</p>
+    <div class="empty-actions">
+      <a href="{{ account_prefix }}" class="btn btn-primary">Back to Dashboard</a>
+      <a href="{{ account_path_prefix }}/compose" class="btn btn-secondary">Try Brand Composer</a>
+    </div>
+  </div>
 {% endif %}
+
+<style>
+.you-header {
+  margin-bottom: 1.25rem;
+}
+
+.you-header h1 {
+  margin: 0 0 0.25rem;
+}
+
+.empty-state-large {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.empty-icon-large {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.empty-actions .btn {
+  text-decoration: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: var(--link);
+  color: white;
+}
+
+.btn-secondary {
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  border: 1px solid var(--border);
+}
+
+.actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actions-bar .btn {
+  text-decoration: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+</style>
+
 {% endblock %}

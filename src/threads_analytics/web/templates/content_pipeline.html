@@ -727,46 +727,6 @@
 </style>
 
 <div class="pipeline-container">
-  <!-- Intake Column -->
-  <div class="pipeline-column" data-status="intake">
-    <div class="column-header">
-      <span class="column-title">📥 Intake</span>
-      <span class="column-count" id="intake-count">{{ intake_items|length }}</span>
-    </div>
-    <div class="column-cards">
-      {% for item in intake_items %}
-      <div class="idea-card intake-card" data-id="{{ item.id }}">
-        <div class="idea-header">
-          <span class="idea-title">{{ item.source_title }}</span>
-          <span class="idea-score score-{% if item.operator_standing_score and item.operator_standing_score >= 80 %}high{% elif item.operator_standing_score and item.operator_standing_score >= 50 %}medium{% else %}low{% endif %}">
-            {{ item.operator_standing_score or '—' }}
-          </span>
-        </div>
-        <div class="intake-meta">
-          <span class="intake-source">{{ {'hn':'🔥 HN','anthropic':'🅰️ Anthropic','openai':'🅾️ OpenAI','gemini':'♊ Gemini','manual':'✋ Manual'}[item.source] or item.source }}</span>
-          {% if item.candidate_mechanics %}
-            {% for m in item.candidate_mechanics %}
-            <span class="intake-mechanic">{{ m.replace('_', ' ') }}</span>
-            {% endfor %}
-          {% endif %}
-        </div>
-        <div class="idea-content">{{ item.summary or item.source_title }}</div>
-        <div class="idea-meta">
-          <span>{{ item.discovered_at.strftime('%b %d %H:%M') if item.discovered_at else '' }}</span>
-          <div class="idea-actions">
-            <a class="action-btn" href="{{ item.source_url }}" target="_blank" title="View source">🔗</a>
-            <button class="action-btn primary" onclick="convertIntake({{ item.id }})" title="Convert to Draft">✨ Draft</button>
-            <button class="action-btn danger" onclick="archiveIntake({{ item.id }})" title="Archive">🗑️</button>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-      {% if not intake_items %}
-      <div class="column-empty">No intake items yet. Run the daily fetch or check back tomorrow.</div>
-      {% endif %}
-    </div>
-  </div>
-
   <!-- Draft Column -->
   <div class="pipeline-column" data-status="draft">
     <div class="column-header">

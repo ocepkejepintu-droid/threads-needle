@@ -266,3 +266,92 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
                 return JSONResponse({"error": "One or more items not found"}, status_code=404)
             drafted = _draft_replies(session, account.id, [item.id for item in items])
         return JSONResponse({"success": True, "drafted": drafted})
+
+    # ── Hermes comment bridge ─────────────────────────────────────────────
+    @router.get("/accounts/{account_slug}/comments/api/pending")
+    def comments_pending_json(request: Request, account_slug: str) -> JSONResponse:
+        """Return pending comments that need replies (for Hermes / external agents)."""
+        with session_scope() as session:
+            account = require_account(session, account_slug)
+            items = session.scalars(
+                select(CommentInbox)
+                .where(
+                    CommentInbox.account_id == account.id,
+                    CommentInbox.status.in_([
+                        CommentInbox.STATUS_DRAFTED,
+                        CommentInbox.STATUS_APPROVED,
+                    ]),
+                )
+                .order_by(desc(CommentInbox.last_seen_at))
+                .limit(50)
+            ).all()
+            payload = [
+                {
+                    "id": item.id,
+                    "comment_author_username": item.comment_author_username,
+                    "comment_text": item.comment_text,
+                    "source_post_text": item.source_post_text[:200] if item.source_post_text else "",
+                    "ai_draft_reply": item.ai_draft_reply,
+                    "final_reply": item.final_reply,
+                    "status": item.status,
+                    "comment_permalink": item.comment_permalink,
+                    "last_seen_at": item.last_seen_at.isoformat() if item.last_seen_at else None,
+                }
+                for item in items
+            ]
+        return JSONResponse({"success": True, "comments": payload, "count": len(payload)})
+
+    @router.post("/accounts/{account_slug}/api/hermes/comments/reply")
+    async def hermes_comment_reply(request: Request, account_slug: str) -> JSONResponse:
+        """Hermes replies to a specific comment. Auto-approves and sends if requested."""
+        from ..config import get_settings
+        from ..publish_gate import gate_send_comment
+
+        settings = get_settings()
+        expected_key = settings.hermes_api_key or ""
+        if expected_key:
+            provided_key = request.headers.get("X-Hermes-Key", "")
+            if not provided_key or provided_key != expected_key:
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+        try:
+            data = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        inbox_id = data.get("inbox_id")
+        reply_text = data.get("reply_text", "").strip()
+        auto_send = data.get("auto_send", False)
+
+        if not inbox_id or not reply_text:
+            return JSONResponse({"error": "inbox_id and reply_text are required"}, status_code=400)
+
+        try:
+            inbox_id = int(inbox_id)
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "Invalid inbox_id"}, status_code=400)
+
+        with session_scope() as session:
+            account = require_account(session, account_slug)
+            item = session.scalar(
+                select(CommentInbox).where(
+                    CommentInbox.id == inbox_id,
+                    CommentInbox.account_id == account.id,
+                )
+            )
+            if not item:
+                return JSONResponse({"error": "Comment not found"}, status_code=404)
+
+            item.final_reply = reply_text
+            if auto_send and item.can_transition_to(CommentInbox.STATUS_SENDING):
+                item.status = CommentInbox.STATUS_APPROVED
+                session.flush()
+                summary = send_selected_comments(session, [item.id])
+                return JSONResponse({
+                    "success": True,
+                    "inbox_id": inbox_id,
+                    "sent": summary.get("sent", 0),
+                    "failed": summary.get("failed", 0),
+                })
+
+        return JSONResponse({"success": True, "inbox_id": inbox_id, "status": "drafted"})

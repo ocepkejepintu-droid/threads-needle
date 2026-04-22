@@ -18,9 +18,13 @@ from .leads import send_reply
 from .models import GeneratedIdea, Lead
 from .planner import plan_account_items
 from .publish_gate import gate_publish_idea, gate_send_reply
+from .comment_inbox import poll_for_comments
+from .comment_reply_drafts import draft_replies_for_inbox
+from .db import init_db
 from .intake.runner import expire_old_items, run_intake_cycle
 from .outcome_tagger import run_outcome_tagging_cycle
 from .publisher import publish_scheduled_idea
+from .threads_client import ThreadsClient
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +39,7 @@ class _SchedulerState:
     stop_event: threading.Event = threading.Event()
     last_intake_date: str | None = None  # YYYY-MM-DD
     last_outcome_hour: str | None = None  # YYYY-MM-DD-HH
+    last_comment_poll: datetime | None = None
 
 
 _state = _SchedulerState()
@@ -206,6 +211,30 @@ def _run_account_replies(account_id: int) -> None:
         time.sleep(2)
 
 
+def _run_comment_poll() -> None:
+    """Poll for new comments and generate reply drafts for all accounts."""
+    from .account_scope import list_accounts
+    from .pipeline import _sync_posts_for_comments
+
+    init_db()
+    with session_scope() as session:
+        accounts = list_accounts(session)
+
+    for account in accounts:
+        try:
+            with ThreadsClient.from_account(account) as client:
+                with session_scope() as session:
+                    _sync_posts_for_comments(session, client, account.id, run_id=0)
+                with session_scope() as session:
+                    poll_for_comments(session, client, account.id, run_id=0)
+                with session_scope() as session:
+                    drafted = draft_replies_for_inbox(session, account.id)
+                if drafted:
+                    log.info("Comment poll drafted %d replies for %s", drafted, account.slug)
+        except Exception as exc:
+            log.warning("Comment poll failed for %s: %s", account.slug, exc)
+
+
 def _publisher_loop() -> None:
     """Main scheduler loop."""
     log.info("Publisher scheduler started")
@@ -231,6 +260,16 @@ def _publisher_loop() -> None:
                 except Exception as exc:
                     log.error("Outcome tagging cycle failed: %s", exc)
                 _state.last_outcome_hour = hour_str
+
+            # Comment poll every 15 minutes
+            if _state.last_comment_poll is None or (
+                now - _state.last_comment_poll
+            ) >= timedelta(minutes=15):
+                try:
+                    _run_comment_poll()
+                except Exception as exc:
+                    log.error("Comment poll failed: %s", exc)
+                _state.last_comment_poll = now
 
             # Claim due work
             _claim_due_posts()

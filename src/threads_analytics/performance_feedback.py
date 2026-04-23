@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, case
 
 from .db import session_scope
 from .models import (
@@ -284,7 +284,7 @@ def compute_mechanic_performances(account_id: int) -> int:
                     func.avg(PredictionAccuracy.actual_replies).label("avg_replies"),
                     func.avg(PredictionAccuracy.actual_reach_multiple).label("avg_reach"),
                     func.sum(
-                        func.case(
+                        case(
                             (PredictionAccuracy.actual_outcome_tag.in_(["breakout", "healthy"]), 1),
                             else_=0,
                         )
@@ -378,7 +378,7 @@ def detect_prediction_bias(account_id: int) -> list[BiasReport]:
                 func.count(PredictionAccuracy.id).label("n"),
                 func.avg(PredictionAccuracy.views_error_pct).label("avg_err"),
                 func.sum(
-                    func.case(
+                    case(
                         (PredictionAccuracy.accuracy_bucket.in_(["bullseye", "close"]), 1),
                         else_=0,
                     )
@@ -413,7 +413,7 @@ def detect_prediction_bias(account_id: int) -> list[BiasReport]:
                 func.count(PredictionAccuracy.id).label("n"),
                 func.avg(PredictionAccuracy.views_error_pct).label("avg_err"),
                 func.sum(
-                    func.case(
+                    case(
                         (PredictionAccuracy.accuracy_bucket.in_(["bullseye", "close"]), 1),
                         else_=0,
                     )
@@ -452,7 +452,7 @@ def detect_prediction_bias(account_id: int) -> list[BiasReport]:
                 func.count(PredictionAccuracy.id).label("n"),
                 func.avg(PredictionAccuracy.views_error_pct).label("avg_err"),
                 func.sum(
-                    func.case(
+                    case(
                         (PredictionAccuracy.accuracy_bucket.in_(["bullseye", "close"]), 1),
                         else_=0,
                     )

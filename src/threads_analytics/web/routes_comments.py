@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from jinja2 import TemplateNotFound
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from ..comment_inbox import (
@@ -125,7 +125,17 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
                 .order_by(desc(CommentInbox.comment_created_at))
             )
             if not archived:
-                stmt = stmt.where(CommentInbox.status != CommentInbox.STATUS_SENT)
+                stmt = stmt.where(
+                    CommentInbox.status != CommentInbox.STATUS_SENT,
+                    or_(
+                        CommentInbox.ai_draft_reply.is_(None),
+                        CommentInbox.ai_draft_reply == "",
+                    ),
+                    or_(
+                        CommentInbox.final_reply.is_(None),
+                        CommentInbox.final_reply == "",
+                    ),
+                )
 
             items = session.scalars(stmt).all()
 
@@ -281,6 +291,14 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
                         CommentInbox.STATUS_DRAFTED,
                         CommentInbox.STATUS_APPROVED,
                     ]),
+                    or_(
+                        CommentInbox.ai_draft_reply.is_(None),
+                        CommentInbox.ai_draft_reply == "",
+                    ),
+                    or_(
+                        CommentInbox.final_reply.is_(None),
+                        CommentInbox.final_reply == "",
+                    ),
                 )
                 .order_by(desc(CommentInbox.comment_created_at))
                 .limit(50)

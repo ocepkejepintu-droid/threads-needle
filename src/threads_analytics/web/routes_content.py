@@ -436,12 +436,12 @@ def register_content_routes(router, templates: Jinja2Templates):
                 mechanic=data.get("mechanic"),
                 predicted_score=data.get("predicted_score", 0),
                 predicted_views_range=data.get("predicted_views_range", ""),
-                rubric_hook_test=data.get("rubric", {}).get("hook_test"),
-                rubric_mechanic_fit=data.get("rubric", {}).get("mechanic_fit"),
-                rubric_operator_standing=data.get("rubric", {}).get("operator_standing"),
-                rubric_trend_freshness=data.get("rubric", {}).get("trend_freshness"),
-                rubric_reply_invitation=data.get("rubric", {}).get("reply_invitation"),
-                rubric_voice_signature=data.get("rubric", {}).get("voice_signature"),
+                rubric_hook_test=data.get("rubric", {}).get("hook_test", 10),
+                rubric_mechanic_fit=data.get("rubric", {}).get("mechanic_fit", 10),
+                rubric_operator_standing=data.get("rubric", {}).get("operator_standing", 10),
+                rubric_trend_freshness=data.get("rubric", {}).get("trend_freshness", 7),
+                rubric_reply_invitation=data.get("rubric", {}).get("reply_invitation", 7),
+                rubric_voice_signature=data.get("rubric", {}).get("voice_signature", 5),
                 scheduled_at=scheduled_at,
             )
             session.add(idea)

@@ -448,6 +448,39 @@ def register_content_routes(router, templates: Jinja2Templates):
             session.flush()
             idea_id = idea.id
 
+            # Auto-publish if requested (approve + publish immediately)
+            if data.get("auto_publish"):
+                from ..publish_gate import gate_approve_idea, gate_publish_idea
+                from ..publisher import publish_scheduled_idea
+
+                gate_approve = gate_approve_idea(idea_id)
+                if not gate_approve.allowed:
+                    return JSONResponse({
+                        "success": True,
+                        "idea_id": idea_id,
+                        "published": False,
+                        "publish_error": gate_approve.reason,
+                    })
+
+                idea.status = "approved"
+                session.flush()
+
+                gate_publish = gate_publish_idea(idea_id)
+                if not gate_publish.allowed:
+                    return JSONResponse({
+                        "success": True,
+                        "idea_id": idea_id,
+                        "published": False,
+                        "publish_error": gate_publish.reason,
+                    })
+
+                published = publish_scheduled_idea(idea_id)
+                return JSONResponse({
+                    "success": True,
+                    "idea_id": idea_id,
+                    "published": published,
+                })
+
         return JSONResponse({"success": True, "idea_id": idea_id})
 
     @router.post("/api/content/{idea_id}/queue")

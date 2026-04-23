@@ -212,7 +212,7 @@ def _run_account_replies(account_id: int) -> None:
 
 
 def _run_comment_poll() -> None:
-    """Poll for new comments and generate reply drafts for all accounts."""
+    """Poll for new comments. Hermes writes replies, not the app LLM."""
     from .account_scope import list_accounts
     from .pipeline import _sync_posts_for_comments
 
@@ -226,11 +226,9 @@ def _run_comment_poll() -> None:
                 with session_scope() as session:
                     _sync_posts_for_comments(session, client, account.id, run_id=0)
                 with session_scope() as session:
-                    poll_for_comments(session, client, account.id, run_id=0)
-                with session_scope() as session:
-                    drafted = draft_replies_for_inbox(session, account.id)
-                if drafted:
-                    log.info("Comment poll drafted %d replies for %s", drafted, account.slug)
+                    result = poll_for_comments(session, client, account.id, run_id=0)
+                if result:
+                    log.info("Comment poll fetched %s comments for %s", result, account.slug)
         except Exception as exc:
             log.warning("Comment poll failed for %s: %s", account.slug, exc)
 

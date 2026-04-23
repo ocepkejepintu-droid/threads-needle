@@ -122,7 +122,7 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
             stmt = (
                 select(CommentInbox)
                 .where(CommentInbox.account_id == account.id)
-                .order_by(desc(CommentInbox.last_seen_at))
+                .order_by(desc(CommentInbox.comment_created_at))
             )
             if not archived:
                 stmt = stmt.where(CommentInbox.status != CommentInbox.STATUS_SENT)
@@ -282,7 +282,7 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
                         CommentInbox.STATUS_APPROVED,
                     ]),
                 )
-                .order_by(desc(CommentInbox.last_seen_at))
+                .order_by(desc(CommentInbox.comment_created_at))
                 .limit(50)
             ).all()
             payload = [
@@ -295,6 +295,7 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
                     "final_reply": item.final_reply,
                     "status": item.status,
                     "comment_permalink": item.comment_permalink,
+                    "comment_created_at": item.comment_created_at.isoformat() if item.comment_created_at else None,
                     "last_seen_at": item.last_seen_at.isoformat() if item.last_seen_at else None,
                 }
                 for item in items

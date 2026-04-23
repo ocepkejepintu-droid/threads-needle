@@ -69,8 +69,9 @@ def _content_policy_checks(
     return None
 
 
-def _rubric_gate_checks(idea: GeneratedIdea) -> GateResult | None:
-    """P1.2 rubric gate: all 6 scores filled, mechanic set, body >= 40 chars."""
+def _rubric_gate_checks(idea: GeneratedIdea) -> list[str]:
+    """P1.2 rubric gate: advisory only — returns warnings, never blocks."""
+    warnings: list[str] = []
     scores = [
         idea.rubric_hook_test,
         idea.rubric_mechanic_fit,
@@ -86,20 +87,15 @@ def _rubric_gate_checks(idea: GeneratedIdea) -> GateResult | None:
         for name, score in zip(names, scores):
             if score is None:
                 missing.append(name)
-        return GateResult(
-            allowed=False,
-            reason=f"Rubric incomplete: missing {', '.join(missing)}",
-        )
+        warnings.append(f"Rubric incomplete: missing {', '.join(missing)}")
 
     if not idea.mechanic:
-        return GateResult(allowed=False, reason="Mechanic tag required")
+        warnings.append("Mechanic tag missing")
 
     if len(idea.concept or "") < 40:
-        return GateResult(
-            allowed=False, reason="Body text must be at least 40 characters"
-        )
+        warnings.append("Body text < 40 characters")
 
-    return None
+    return warnings
 
 
 def gate_approve_idea(idea_id: int) -> GateResult:
@@ -118,9 +114,10 @@ def gate_approve_idea(idea_id: int) -> GateResult:
         if "publish" not in (account.enabled_capabilities or []):
             return GateResult(allowed=False, reason="Publishing not enabled for this account")
 
-        rubric = _rubric_gate_checks(idea)
-        if rubric is not None:
-            return rubric
+        # Rubric checks are advisory only — log warnings but don't block
+        rubric_warnings = _rubric_gate_checks(idea)
+        for warning in rubric_warnings:
+            log.warning("Rubric advisory for idea %s: %s", idea_id, warning)
 
         # Content policy checks are advisory only — log warnings but don't block
         policy = _content_policy_checks(session, idea, account)

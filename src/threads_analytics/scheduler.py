@@ -23,6 +23,7 @@ from .comment_reply_drafts import draft_replies_for_inbox
 from .db import init_db
 from .intake.runner import expire_old_items, run_intake_cycle
 from .outcome_tagger import run_outcome_tagging_cycle
+from .performance_feedback import run_feedback_cycle
 from .publisher import publish_scheduled_idea
 from .threads_client import ThreadsClient
 
@@ -40,6 +41,7 @@ class _SchedulerState:
     last_intake_date: str | None = None  # YYYY-MM-DD
     last_outcome_hour: str | None = None  # YYYY-MM-DD-HH
     last_comment_poll: datetime | None = None
+    last_feedback_hour: str | None = None  # YYYY-MM-DD-HH
 
 
 _state = _SchedulerState()
@@ -258,6 +260,15 @@ def _publisher_loop() -> None:
                 except Exception as exc:
                     log.error("Outcome tagging cycle failed: %s", exc)
                 _state.last_outcome_hour = hour_str
+
+            # Hourly prediction feedback cycle
+            if _state.last_feedback_hour != hour_str:
+                try:
+                    run_feedback_cycle()
+                    log.info("Feedback cycle complete")
+                except Exception as exc:
+                    log.error("Feedback cycle failed: %s", exc)
+                _state.last_feedback_hour = hour_str
 
             # Comment poll every 15 minutes
             if _state.last_comment_poll is None or (

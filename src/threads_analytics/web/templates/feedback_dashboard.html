@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Prediction Calibration</h1>
+  <p class="subtitle">How accurate are your content predictions? Systematic bias by mechanic, tier, and time.</p>
+</div>
+
+<div class="dashboard-grid">
+
+  <!-- Summary Cards -->
+  <div class="card-grid cols-4">
+    <div class="metric-card">
+      <div class="metric-label">Published Tracked</div>
+      <div class="metric-value">{{ report.total_published }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Prediction Accuracy</div>
+      <div class="metric-value">{{ report.accuracy_rate }}%</div>
+      <div class="metric-sub">Within 50% of actual views</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Avg Error</div>
+      <div class="metric-value">{{ report.avg_error_pct }}%</div>
+      <div class="metric-sub">{% if report.avg_error_pct > 0 %}Too optimistic{% else %}Too conservative{% endif %}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Top Mechanic</div>
+      <div class="metric-value">{{ report.top_performing_mechanic or "—" }}</div>
+    </div>
+  </div>
+
+  <!-- Bias Reports -->
+  {% if report.bias_reports %}
+  <div class="card">
+    <h2>Systematic Bias Detected</h2>
+    <div class="bias-list">
+      {% for bias in report.bias_reports %}
+      <div class="bias-item {{ 'bias-over' if bias.avg_error_pct > 30 else 'bias-under' if bias.avg_error_pct < -30 else 'bias-ok' }}">
+        <div class="bias-header">
+          <span class="badge">{{ bias.dimension }}</span>
+          <strong>{{ bias.value }}</strong>
+          <span class="sample-size">n={{ bias.sample_size }}</span>
+        </div>
+        <div class="bias-body">
+          <div class="bias-metric">
+            <span class="bias-number">{{ "+" if bias.avg_error_pct > 0 else "" }}{{ bias.avg_error_pct }}%</span>
+            <span class="bias-label">avg error</span>
+          </div>
+          <div class="bias-metric">
+            <span class="bias-number">{{ bias.accuracy_rate }}%</span>
+            <span class="bias-label">within range</span>
+          </div>
+          <p class="bias-insight">{{ bias.insight }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Suggestions -->
+  {% if report.suggestions %}
+  <div class="card">
+    <h2>Calibration Suggestions</h2>
+    <ul class="suggestion-list">
+      {% for suggestion in report.suggestions %}
+      <li>{{ suggestion }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Mechanic Performance -->
+  <div class="card">
+    <h2>Mechanic Performance (30d)</h2>
+    <div id="mechanic-chart-container" style="height: 280px;">
+      <canvas id="mechanicChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Recent Accuracy Table -->
+  <div class="card">
+    <h2>Recent Predictions vs Actuals</h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Mechanic</th>
+            <th>Tier</th>
+            <th>Predicted</th>
+            <th>Actual Views</th>
+            <th>Error</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody id="accuracy-tbody">
+          <tr><td colspan="6" class="text-center">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const accountPrefix = '{{ account_path_prefix|default("/accounts/default") }}';
+
+  // Load mechanic performance
+  fetch(`${accountPrefix}/api/feedback/mechanics?window=30d`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success || !data.mechanics.length) {
+        document.getElementById('mechanic-chart-container').innerHTML =
+          '<p class="text-center text-muted">No mechanic data yet</p>';
+        return;
+      }
+      const ctx = document.getElementById('mechanicChart').getContext('2d');
+      const labels = data.mechanics.map(m => m.mechanic);
+      const avgViews = data.mechanics.map(m => m.avg_views);
+      const winRates = data.mechanics.map(m => m.win_rate);
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Avg Views',
+              data: avgViews,
+              backgroundColor: 'rgba(99, 102, 241, 0.7)',
+              yAxisID: 'y',
+            },
+            {
+              label: 'Win Rate %',
+              data: winRates,
+              type: 'line',
+              borderColor: 'rgba(34, 197, 94, 0.9)',
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              yAxisID: 'y1',
+              tension: 0.3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Avg Views' } },
+            y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100, title: { display: true, text: 'Win Rate %' } },
+          }
+        }
+      });
+    });
+
+  // Load recent accuracies
+  fetch(`${accountPrefix}/api/feedback/accuracies?limit=20`)
+    .then(r => r.json())
+    .then(data => {
+      const tbody = document.getElementById('accuracy-tbody');
+      if (!data.success || !data.items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No data yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.items.map(item => {
+        const bucketClass = item.accuracy_bucket === 'bullseye' ? 'tag-success' :
+                           item.accuracy_bucket === 'close' ? 'tag-warning' : 'tag-danger';
+        return `<tr>
+          <td>${item.predicted_mechanic || '—'}</td>
+          <td>${item.predicted_tier || '—'}</td>
+          <td>${item.predicted_score} / ${item.predicted_views_range || '—'}</td>
+          <td>${item.actual_views.toLocaleString()}</td>
+          <td><span class="${bucketClass}">${item.views_error_pct > 0 ? '+' : ''}${item.views_error_pct}%</span></td>
+          <td><span class="tag">${item.actual_outcome_tag || '—'}</span></td>
+        </tr>`;
+      }).join('');
+    });
+</script>
+
+<style>
+  .bias-list { display: grid; gap: 12px; }
+  .bias-item { padding: 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); }
+  .bias-item.bias-over { border-left: 4px solid #f59e0b; }
+  .bias-item.bias-under { border-left: 4px solid #22c55e; }
+  .bias-item.bias-ok { border-left: 4px solid #6366f1; }
+  .bias-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .bias-header .badge { font-size: 11px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: var(--surface); color: var(--muted); }
+  .sample-size { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .bias-body { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .bias-metric { text-align: center; }
+  .bias-number { display: block; font-size: 20px; font-weight: 700; }
+  .bias-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .bias-insight { flex: 1; min-width: 200px; margin: 0; font-size: 14px; color: var(--text-secondary); }
+  .suggestion-list { padding-left: 20px; }
+  .suggestion-list li { margin-bottom: 8px; color: var(--text-secondary); }
+  .tag-success { color: #16a34a; font-weight: 600; }
+  .tag-warning { color: #ca8a04; font-weight: 600; }
+  .tag-danger { color: #dc2626; font-weight: 600; }
+</style>
+
+{% endblock %}

@@ -945,3 +945,75 @@ class Notification(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PredictionAccuracy(Base):
+    """Tracks how well predictions match actual post performance.
+
+    One row per published idea. Computed after the post has enough data
+    (typically 24h+). Used to calibrate future predictions and surface
+    systematic bias by mechanic, tier, topic, etc.
+    """
+
+    __tablename__ = "prediction_accuracies"
+    __table_args__ = (UniqueConstraint("account_id", "idea_id", name="uq_pred_acc_idea"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    idea_id: Mapped[int] = mapped_column(ForeignKey("generated_ideas.id"))
+    post_thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Prediction at time of creation
+    predicted_score: Mapped[int] = mapped_column(Integer, default=0)
+    predicted_views_range: Mapped[str] = mapped_column(String(16), default="")
+    predicted_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    predicted_mechanic: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    # Actual performance (from PostOutcome or latest MyPostInsight)
+    actual_views: Mapped[int] = mapped_column(Integer, default=0)
+    actual_likes: Mapped[int] = mapped_column(Integer, default=0)
+    actual_replies: Mapped[int] = mapped_column(Integer, default=0)
+    actual_reposts: Mapped[int] = mapped_column(Integer, default=0)
+    actual_reach_multiple: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_outcome_tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    # Accuracy metrics
+    views_error_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # positive = overpredicted, negative = underpredicted
+    score_error: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # predicted_score - actual_score (where actual_score is derived from views)
+
+    # Bucketed accuracy for quick filtering
+    accuracy_bucket: Mapped[str | None] = mapped_column(
+        String(16), nullable=True
+    )  # "bullseye" | "close" | "off" | "way_off"
+
+    # When this accuracy record was computed
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    idea: Mapped["GeneratedIdea | None"] = relationship("GeneratedIdea")
+
+
+class MechanicPerformance(Base):
+    """Rolling performance stats per mechanic for quick feedback queries."""
+
+    __tablename__ = "mechanic_performances"
+    __table_args__ = (UniqueConstraint("account_id", "mechanic", "window", name="uq_mech_perf"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), default=1)
+    mechanic: Mapped[str] = mapped_column(String(32))
+    window: Mapped[str] = mapped_column(String(16))  # "7d" | "30d" | "90d" | "all"
+
+    posts_count: Mapped[int] = mapped_column(Integer, default=0)
+    avg_views: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_likes: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_replies: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_reach_multiple: Mapped[float] = mapped_column(Float, default=0.0)
+    win_rate: Mapped[float] = mapped_column(Float, default=0.0)  # % breakout + healthy
+
+    # Trend vs previous window
+    trend: Mapped[str] = mapped_column(String(16), default="")  # "up" | "down" | "flat"
+    trend_delta_pct: Mapped[float] = mapped_column(Float, default=0.0)
+
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

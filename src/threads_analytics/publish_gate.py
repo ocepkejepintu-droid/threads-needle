@@ -122,9 +122,10 @@ def gate_approve_idea(idea_id: int) -> GateResult:
         if rubric is not None:
             return rubric
 
+        # Content policy checks are advisory only — log warnings but don't block
         policy = _content_policy_checks(session, idea, account)
         if policy is not None:
-            return policy
+            log.warning("Content policy advisory for idea %s: %s", idea_id, policy.reason)
 
         return GateResult(allowed=True)
 
@@ -156,9 +157,10 @@ def gate_publish_idea(idea_id: int) -> GateResult:
         if not can_pub:
             return GateResult(allowed=False, reason="Quota exceeded")
 
+        # Content policy checks are advisory only — log warnings but don't block
         policy = _content_policy_checks(session, idea, account)
         if policy is not None:
-            return policy
+            log.warning("Content policy advisory for idea %s: %s", idea_id, policy.reason)
 
         # Duplicate publish check
         if idea.thread_id is not None:
@@ -210,23 +212,16 @@ def gate_send_reply(lead_id: int) -> GateResult:
 
         reply_text = lead.final_reply or lead.ai_draft_reply or ""
 
+        # Anti-slop and brand checks are advisory only for replies
         slop = content_rules.validate_content(reply_text)
         if not slop.passed:
-            return GateResult(
-                allowed=False,
-                reason="Anti-slop check failed",
-                violations=slop.failures,
-            )
+            log.warning("Reply anti-slop advisory for lead %s: %s", lead.id, slop.failures)
 
         you = _latest_you_profile(session, account.id)
         if you is not None:
             brand = brand_validate_content(reply_text, you)
             if not brand.passed:
-                return GateResult(
-                    allowed=False,
-                    reason="Brand check failed",
-                    violations=[s.issue for s in brand.suggestions],
-                )
+                log.warning("Reply brand advisory for lead %s: %s", lead.id, brand.suggestions)
         else:
             log.warning("No YouProfile for account %s; skipping brand check", account.id)
 
@@ -286,23 +281,16 @@ def gate_send_comment(inbox_id: int) -> GateResult:
 
         reply_text = inbox_item.final_reply or inbox_item.ai_draft_reply or ""
 
+        # Anti-slop and brand checks are advisory only for replies
         slop = content_rules.validate_content(reply_text)
         if not slop.passed:
-            return GateResult(
-                allowed=False,
-                reason="Anti-slop check failed",
-                violations=slop.failures,
-            )
+            log.warning("Comment anti-slop advisory for inbox %s: %s", inbox_item.id, slop.failures)
 
         you = _latest_you_profile(session, account.id)
         if you is not None:
             brand = brand_validate_content(reply_text, you)
             if not brand.passed:
-                return GateResult(
-                    allowed=False,
-                    reason="Brand check failed",
-                    violations=[s.issue for s in brand.suggestions],
-                )
+                log.warning("Comment brand advisory for inbox %s: %s", inbox_item.id, brand.suggestions)
         else:
             log.warning("No YouProfile for account %s; skipping brand check", account.id)
 

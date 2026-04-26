@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     # Scheduling timezone (default: Asia/Jakarta / WIB UTC+7)
     schedule_timezone: str = "Asia/Jakarta"
 
+    # Web server startup behavior. Disable for local UI smoke tests to avoid
+    # background API calls while still serving the dashboard.
+    scheduler_enabled: bool = True
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

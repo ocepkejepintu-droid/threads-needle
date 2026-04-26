@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
+
 from ..db import session_scope
 from ..models import IntakeItem
 from .dedupe import dedupe_items
-from .fetchers import RawIntakeItem, fetch_all_sources
+from .fetchers import fetch_all_sources
 from .filter import FilteredItem, filter_and_summarize_with_llm
 
 log = logging.getLogger(__name__)
@@ -98,6 +100,3 @@ def expire_old_items(account_id: int = 1) -> int:
         if count:
             log.info("Expired %d intake items", count)
         return count
-
-
-from sqlalchemy import select  # noqa: E402

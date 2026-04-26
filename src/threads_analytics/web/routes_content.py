@@ -17,6 +17,12 @@ from ..account_scope import require_idea_ownership
 from ..db import session_scope
 from ..publish_gate import gate_approve_idea, gate_publish_idea, invalidate_approval_on_edit
 from ..models import Experiment, GeneratedIdea, IntakeItem, PostOutcome
+from .content_support import (
+    allowed_slot_labels,
+    request_json_or_none,
+    slot_matches_tier,
+    validate_image_bytes,
+)
 from .routes_common import (
     log,
     redirect_to_account_route,
@@ -24,49 +30,6 @@ from .routes_common import (
     require_account,
     with_account_context,
 )
-
-
-def _validate_image_bytes(data: bytes) -> bool:
-    if len(data) < 12:
-        return False
-    if data.startswith(b"\xff\xd8\xff"):
-        return True
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return True
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return True
-    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        return True
-    return False
-
-
-# P1.3 Tier-Slot Schedule (WIB times, stored as hour:minute strings)
-_SLOT_SCHEDULE = [
-    # (day_index 0=Mon, hour, minute, tier, label)
-    (0, 11, 0, "hero", "Mon 11:00"),
-    (1, 12, 0, "engine", "Tue 12:00"),
-    (2, 12, 0, "engine", "Wed 12:00"),
-    (2, 20, 0, "engine", "Wed 20:00"),
-    (3, 12, 0, "engine", "Thu 12:00"),
-    (4, 11, 0, "hero", "Fri 11:00"),
-    (4, 14, 0, "engine", "Fri 14:00"),
-    (5, 10, 0, "signal", "Sat 10:00"),
-]
-
-
-def _slot_matches_tier(slot_time: datetime, tier: str | None) -> bool:
-    """Check if a scheduled datetime matches a tier's allowed slots."""
-    if tier is None:
-        return True
-    tz = get_schedule_timezone()
-    local = slot_time.astimezone(tz)
-    wd = local.weekday()  # 0=Monday
-    hh = local.hour
-    mm = local.minute
-    for d, h, m, t, _ in _SLOT_SCHEDULE:
-        if d == wd and h == hh and m == mm and t == tier:
-            return True
-    return False
 
 
 def register_content_routes(router, templates: Jinja2Templates):
@@ -257,9 +220,8 @@ def register_content_routes(router, templates: Jinja2Templates):
     async def api_edit_idea_prefixed(
         request: Request, account_slug: str, idea_id: int
     ) -> JSONResponse:
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         concept = data.get("concept", "")
@@ -288,9 +250,8 @@ def register_content_routes(router, templates: Jinja2Templates):
     async def api_save_rubric_prefixed(
         request: Request, account_slug: str, idea_id: int
     ) -> JSONResponse:
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         rubric = data.get("rubric", {})
@@ -336,9 +297,8 @@ def register_content_routes(router, templates: Jinja2Templates):
 
     @router.post("/accounts/{account_slug}/api/content/create")
     async def api_create_idea_prefixed(request: Request, account_slug: str) -> JSONResponse:
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         concept = data.get("concept", "").strip()
@@ -400,9 +360,8 @@ def register_content_routes(router, templates: Jinja2Templates):
             if not provided_key or provided_key != expected_key:
                 return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         concept = data.get("concept", "").strip()
@@ -537,9 +496,8 @@ def register_content_routes(router, templates: Jinja2Templates):
 
         tz = get_schedule_timezone()
 
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         time_slot = data.get("time_slot")
@@ -589,15 +547,13 @@ def register_content_routes(router, templates: Jinja2Templates):
                 return JSONResponse({"error": gate.reason}, status_code=400)
 
             # P1.3 Tier-slot validation
-            if not _slot_matches_tier(scheduled, idea.tier):
+            if not slot_matches_tier(scheduled, idea.tier):
                 return JSONResponse(
                     {
                         "error": (
                             f"Tier '{idea.tier}' cannot be scheduled at this time. "
                             f"Allowed slots for {idea.tier}: "
-                            + ", ".join(
-                                label for d, h, m, t, label in _SLOT_SCHEDULE if t == idea.tier
-                            )
+                            + ", ".join(allowed_slot_labels(idea.tier))
                         )
                     },
                     status_code=400,
@@ -676,9 +632,8 @@ def register_content_routes(router, templates: Jinja2Templates):
 
     @router.post("/accounts/{account_slug}/api/content/{idea_id}/move")
     async def api_move_idea_prefixed(request: Request, account_slug: str, idea_id: int) -> Response:
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         target_status = data.get("status")
@@ -794,10 +749,7 @@ def register_content_routes(router, templates: Jinja2Templates):
     async def api_convert_intake_prefixed(
         request: Request, account_slug: str, intake_id: int
     ) -> JSONResponse:
-        try:
-            data = await request.json()
-        except Exception:
-            data = {}
+        data = await request_json_or_none(request) or {}
 
         concept = data.get("concept", "").strip()
         mechanic = data.get("mechanic")
@@ -865,9 +817,8 @@ def register_content_routes(router, templates: Jinja2Templates):
     async def api_update_image_prefixed(
         request: Request, account_slug: str, idea_id: int
     ) -> Response:
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         image_url = data.get("image_url", "")
@@ -908,7 +859,7 @@ def register_content_routes(router, templates: Jinja2Templates):
 
             contents = await file.read()
 
-            if not _validate_image_bytes(contents):
+            if not validate_image_bytes(contents):
                 return JSONResponse(
                     {"error": "File content does not match a valid image"}, status_code=400
                 )
@@ -984,7 +935,7 @@ def register_content_routes(router, templates: Jinja2Templates):
 
             contents = await file.read()
 
-            if not _validate_image_bytes(contents):
+            if not validate_image_bytes(contents):
                 return JSONResponse(
                     {"error": "File content does not match a valid image"}, status_code=400
                 )
@@ -1024,9 +975,8 @@ def register_content_routes(router, templates: Jinja2Templates):
     ) -> JSONResponse:
         from datetime import timedelta
 
-        try:
-            data = await request.json()
-        except Exception:
+        data = await request_json_or_none(request)
+        if data is None:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
         day_index = data.get("day_index", 0)

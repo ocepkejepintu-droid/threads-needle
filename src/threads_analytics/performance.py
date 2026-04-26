@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import case, func, select
 
 from .db import session_scope
-from .models import GeneratedIdea, IntakeItem, MyPostInsight, PostOutcome, PostTopic, Topic
+from .models import GeneratedIdea, PostOutcome, PostTopic, Topic
 
 
 # Tier targets from the spec

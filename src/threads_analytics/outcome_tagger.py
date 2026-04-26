@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from .db import session_scope
-from .models import GeneratedIdea, MyPost, MyPostInsight, PostOutcome
+from .models import GeneratedIdea, MyPostInsight, PostOutcome
 from .threads_client import ThreadsClient
 
 log = logging.getLogger(__name__)

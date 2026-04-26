@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from ..config import get_settings
 from ..db import init_db
 from ..scheduler import start_scheduler, stop_scheduler
 from .routes import build_router
@@ -39,10 +40,13 @@ def _intcomma(value: int | float | None) -> str:
 async def lifespan(app: FastAPI):
     """Manage startup and shutdown events."""
     # Startup
-    start_scheduler()
+    scheduler_started = get_settings().scheduler_enabled
+    if scheduler_started:
+        start_scheduler()
     yield
     # Shutdown
-    stop_scheduler()
+    if scheduler_started:
+        stop_scheduler()
 
 
 def create_app() -> FastAPI:

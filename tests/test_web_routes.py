@@ -10,6 +10,62 @@ from fastapi.testclient import TestClient
 pytest_plugins = ["tests.fixtures_accounts"]
 
 
+def test_lifespan_skips_scheduler_when_disabled(configured_test_db, monkeypatch):
+    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
+
+    from threads_analytics import config
+    from threads_analytics.web import app as app_mod
+
+    config.get_settings.cache_clear()
+    started = False
+    stopped = False
+
+    def fake_start_scheduler() -> None:
+        nonlocal started
+        started = True
+
+    def fake_stop_scheduler() -> None:
+        nonlocal stopped
+        stopped = True
+
+    monkeypatch.setattr(app_mod, "start_scheduler", fake_start_scheduler)
+    monkeypatch.setattr(app_mod, "stop_scheduler", fake_stop_scheduler)
+
+    with TestClient(app_mod.create_app()) as client:
+        response = client.get("/accounts/default")
+
+    assert response.status_code == 200
+    assert started is False
+    assert stopped is False
+
+
+def test_lifespan_starts_scheduler_by_default(configured_test_db, monkeypatch):
+    from threads_analytics import config
+    from threads_analytics.web import app as app_mod
+
+    config.get_settings.cache_clear()
+    started = False
+    stopped = False
+
+    def fake_start_scheduler() -> None:
+        nonlocal started
+        started = True
+
+    def fake_stop_scheduler() -> None:
+        nonlocal stopped
+        stopped = True
+
+    monkeypatch.setattr(app_mod, "start_scheduler", fake_start_scheduler)
+    monkeypatch.setattr(app_mod, "stop_scheduler", fake_stop_scheduler)
+
+    with TestClient(app_mod.create_app()) as client:
+        response = client.get("/accounts/default")
+
+    assert response.status_code == 200
+    assert started is True
+    assert stopped is True
+
+
 @pytest.fixture()
 def populated_app(configured_test_db, default_account):
     from threads_analytics.db import init_db, session_scope

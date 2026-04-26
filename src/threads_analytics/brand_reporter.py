@@ -56,12 +56,12 @@ def generate_weekly_report(session: "Session", account_id: int | None = None) ->
             "recommendations": list[str],
         }
     """
-    # Calculate week boundaries (Monday to Sunday)
+    # Use a rolling 7-day window so the report is useful at the start of a week too.
     today = date.today()
     week_end = today
-    week_start = today - timedelta(days=today.weekday())  # Monday of current week
+    week_start = today - timedelta(days=6)
 
-    # Get posts from this week
+    # Get posts from the reporting window
     stmt = (
         select(MyPost)
         .where(
@@ -410,7 +410,7 @@ def _get_weekly_average_scores(
     weekly_data = []
 
     for week_offset in range(weeks):
-        week_end = today - timedelta(weeks=week_offset, days=today.weekday())
+        week_end = today - timedelta(days=week_offset * 7)
         week_start = week_end - timedelta(days=6)
 
         stmt = select(MyPost).where(

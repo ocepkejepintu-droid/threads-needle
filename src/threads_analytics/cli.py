@@ -10,8 +10,9 @@ from typing import cast
 import typer
 import uvicorn
 
-from .account_scope import get_account_by_slug, get_or_create_default_account, get_scoped
+from .account_scope import get_scoped
 from .backfill import backfill_history
+from .cli_support import resolve_account_or_exit, update_env_file
 from .config import get_settings
 from .db import init_db, session_scope
 from .leads_search import run_lead_searches
@@ -24,19 +25,6 @@ from datetime import datetime, timezone, timedelta
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = typer.Typer(help="Analytics + growth recommender for a personal Threads account.")
-
-
-def _resolve_account_or_exit(account: str | None):
-    with session_scope() as session:
-        acct = (
-            get_account_by_slug(session, account)
-            if account
-            else get_or_create_default_account(session)
-        )
-    if acct is None:
-        typer.secho(f"Unknown account slug: {account}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-    return acct
 
 
 @app.command()
@@ -61,13 +49,13 @@ def refresh(
     account: str | None = typer.Option(None, help="Account slug"),
 ) -> None:
     """Refresh the long-lived Threads access token (run every ~50 days)."""
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
     client = ThreadsClient.from_account(acct)
     new_token = client.refresh_long_lived_token()
     from .account_scope import DEFAULT_ACCOUNT_SLUG
 
     if acct.slug == DEFAULT_ACCOUNT_SLUG:
-        _update_env_file("THREADS_ACCESS_TOKEN", new_token)
+        update_env_file("THREADS_ACCESS_TOKEN", new_token)
     with session_scope() as session:
         from .models import Account
 
@@ -109,7 +97,7 @@ def backfill(
 def whoami(account: str | None = typer.Option(None, help="Account slug")) -> None:
     """Verify the token by calling /me on the Threads API."""
     try:
-        acct = _resolve_account_or_exit(account)
+        acct = resolve_account_or_exit(account)
         with ThreadsClient.from_account(acct) as client:
             data = client.get_me()
     except RuntimeError as exc:
@@ -119,28 +107,6 @@ def whoami(account: str | None = typer.Option(None, help="Account slug")) -> Non
         typer.secho(f"✗ Threads API call failed: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     typer.echo(json.dumps(data, indent=2))
-
-
-def _update_env_file(key: str, value: str, path: str = ".env") -> None:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        lines = []
-    found = False
-    out: list[str] = []
-    for line in lines:
-        if line.startswith(f"{key}="):
-            out.append(f"{key}={value}\n")
-            found = True
-        else:
-            out.append(line)
-    if not found:
-        out.append(f"{key}={value}\n")
-    with open(path, "w", encoding="utf-8") as f:
-        f.writelines(out)
-
-
 @app.command()
 def search_leads(
     manual: bool = typer.Option(False, "--manual", "-m", help="Run even if not due by frequency"),
@@ -157,7 +123,7 @@ def search_leads(
     else:
         typer.echo("Checking lead sources...")
 
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
 
     with session_scope() as session:
         run = Run(account_id=acct.id, started_at=datetime.now(timezone.utc), status="running")
@@ -289,7 +255,7 @@ def draft_replies(
     from .leads import draft_replies_for_leads
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
     typer.echo(f"Generating reply drafts (min_tier={min_tier}, max={max})...")
 
     with session_scope() as session:
@@ -308,7 +274,7 @@ def update_reply_metrics(
     from .leads_analytics import update_reply_metrics as _update_reply_metrics
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
     typer.echo("Updating reply metrics...")
 
     with session_scope() as session:
@@ -435,7 +401,7 @@ def brand_check(
     from .models import YouProfile
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
 
     with session_scope() as session:
         you_profile = session.scalar(
@@ -483,7 +449,7 @@ def brand_health(
     from .models import YouProfile
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
 
     with session_scope() as session:
         you_profile = session.scalar(
@@ -573,7 +539,7 @@ def extract_patterns(
     from .growth_patterns import extract_patterns as _extract_patterns
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
     typer.echo("Extracting patterns from top posts...")
 
     with session_scope() as session:
@@ -665,7 +631,7 @@ def generate_ideas(
         typer.echo(f"Generating {count} ideas from your canonical idea pipeline")
     typer.echo("=" * 50)
 
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
     ideas = idea_generator.generate_ideas(topic=topic, count=count, account_id=acct.id)
 
     if not ideas:
@@ -711,7 +677,7 @@ def list_scheduled(
     from sqlalchemy import select
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
 
     with session_scope() as session:
         scheduled = session.scalars(
@@ -749,7 +715,7 @@ def post_now(
     from .publisher import publish_post
 
     init_db()
-    acct = _resolve_account_or_exit(account)
+    acct = resolve_account_or_exit(account)
 
     with session_scope() as session:
         idea = get_scoped(session, GeneratedIdea, idea_id, acct.id)
@@ -821,13 +787,12 @@ def intake(
     """Run the daily intake fetcher manually."""
     from .intake.runner import run_intake_cycle
 
-    with session_scope() as session:
-        acct = _resolve_account(session, account)
-        result = run_intake_cycle(account_id=acct.id)
-        typer.secho(
-            f"✓ Intake complete: {result['persisted']} new items from {result['sources']}",
-            fg=typer.colors.GREEN,
-        )
+    acct = resolve_account_or_exit(account)
+    result = run_intake_cycle(account_id=acct.id)
+    typer.secho(
+        f"✓ Intake complete: {result['persisted']} new items from {result['sources']}",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command()
@@ -838,20 +803,19 @@ def tag_outcomes(
     """Run outcome tagging for published posts."""
     from .outcome_tagger import backfill_outcomes, run_outcome_tagging_cycle
 
-    with session_scope() as session:
-        acct = _resolve_account(session, account)
-        if backfill:
-            result = backfill_outcomes(account_id=acct.id)
-            typer.secho(
-                f"✓ Backfilled {result['tagged']} posts ({result['errors']} errors)",
-                fg=typer.colors.GREEN,
-            )
-        else:
-            result = run_outcome_tagging_cycle(account_id=acct.id)
-            typer.secho(
-                f"✓ Tagged {result['tagged']} posts, skipped {result['skipped']}, errors {result['errors']}",
-                fg=typer.colors.GREEN,
-            )
+    acct = resolve_account_or_exit(account)
+    if backfill:
+        result = backfill_outcomes(account_id=acct.id)
+        typer.secho(
+            f"✓ Backfilled {result['tagged']} posts ({result['errors']} errors)",
+            fg=typer.colors.GREEN,
+        )
+    else:
+        result = run_outcome_tagging_cycle(account_id=acct.id)
+        typer.secho(
+            f"✓ Tagged {result['tagged']} posts, skipped {result['skipped']}, errors {result['errors']}",
+            fg=typer.colors.GREEN,
+        )
 
 
 if __name__ == "__main__":

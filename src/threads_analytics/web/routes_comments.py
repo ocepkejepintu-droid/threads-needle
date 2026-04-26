@@ -324,7 +324,6 @@ def register_comments_routes(router: APIRouter, templates: Jinja2Templates) -> N
     async def hermes_comment_reply(request: Request, account_slug: str) -> JSONResponse:
         """Hermes replies to a specific comment. Auto-approves and sends if requested."""
         from ..config import get_settings
-        from ..publish_gate import gate_send_comment
 
         settings = get_settings()
         expected_key = settings.hermes_api_key or ""

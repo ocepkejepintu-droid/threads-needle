@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -69,6 +69,20 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["intcomma"] = _intcomma
     app.state.templates = templates
+
+    @app.get("/sw.js")
+    async def service_worker() -> Response:
+        """Serve the service worker at root scope with permissive headers."""
+        sw_path = STATIC_DIR / "sw.js"
+        if sw_path.exists():
+            content = sw_path.read_text(encoding="utf-8")
+            return Response(
+                content,
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/"},
+            )
+        return Response("// no sw", media_type="application/javascript")
+
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.include_router(build_router(templates))

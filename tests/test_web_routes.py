@@ -380,6 +380,51 @@ def test_growth_ideas_prefixed_route_filters_by_account(populated_app):
     assert "Writer B scheduled idea" in alt_ideas.text
 
 
+def test_growth_idea_dismiss_requires_post_and_is_account_scoped(populated_app):
+    client, ids = populated_app
+
+    unsafe_get = client.get(
+        f"/accounts/{ids['default']}/growth/ideas/{ids['default_idea_id']}/dismiss",
+        follow_redirects=False,
+    )
+    assert unsafe_get.status_code == 405
+
+    from threads_analytics.db import session_scope
+    from threads_analytics.models import GeneratedIdea
+
+    with session_scope() as session:
+        idea = session.get(GeneratedIdea, ids["default_idea_id"])
+        assert idea is not None
+        assert idea.status == "draft"
+
+    unsafe_legacy_post = client.post(f"/growth/ideas/{ids['default_idea_id']}/dismiss")
+    assert unsafe_legacy_post.status_code == 400
+    assert unsafe_legacy_post.json()["error"] == "Use account-prefixed route"
+
+    dismissed = client.post(
+        f"/accounts/{ids['default']}/growth/ideas/{ids['default_idea_id']}/dismiss",
+        follow_redirects=False,
+    )
+    assert dismissed.status_code == 303
+    assert dismissed.headers["location"] == f"/accounts/{ids['default']}/growth/ideas"
+
+    with session_scope() as session:
+        idea = session.get(GeneratedIdea, ids["default_idea_id"])
+        assert idea is not None
+        assert idea.status == "rejected"
+
+
+def test_growth_idea_dismiss_renders_post_form(populated_app):
+    client, ids = populated_app
+    response = client.get(f"/accounts/{ids['default']}/growth/ideas")
+
+    assert response.status_code == 200
+    dismiss_path = f'/accounts/{ids["default"]}/growth/ideas/{ids["default_idea_id"]}/dismiss'
+    assert f'action="{dismiss_path}"' in response.text
+    assert 'method="post"' in response.text
+    assert f'href="{dismiss_path}"' not in response.text
+
+
 def test_legacy_mutating_route_is_rejected(populated_app):
     client, ids = populated_app
     r = client.post(f"/api/content/{ids['default_idea_id']}/dismiss")

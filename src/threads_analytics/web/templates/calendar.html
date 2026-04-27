@@ -34,7 +34,7 @@
         <div class="post-actions">
           <button class="action-btn" onclick="openPostModal({{ post.id }})" title="View/Edit">✏️</button>
           {% if post.status != 'published' %}
-          <button class="action-btn danger" onclick="deletePost({{ post.id }})" title="Delete">🗑️</button>
+          <button class="action-btn danger" onclick="dismissPost({{ post.id }})" title="Dismiss post" aria-label="Dismiss scheduled post">🗑️</button>
           {% endif %}
         </div>
       </div>
@@ -532,8 +532,8 @@ async function savePost() {
   }
 }
 
-async function deletePost(postId) {
-  if (!confirm('Delete this post? This cannot be undone.')) return;
+async function dismissPost(postId) {
+  if (!confirm('Dismiss this scheduled post? It will be moved to rejected content, not permanently deleted.')) return;
   
   try {
     const resp = await fetch(`{{ account_path_prefix }}/api/content/${postId}/dismiss`, {
@@ -543,7 +543,7 @@ async function deletePost(postId) {
     if (resp.ok) {
       window.location.reload();
     } else {
-      alert('Failed to delete');
+      alert('Failed to dismiss post');
     }
   } catch (e) {
     alert('Error: ' + e.message);

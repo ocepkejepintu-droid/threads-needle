@@ -179,13 +179,11 @@ def register_growth_routes(router, templates: Jinja2Templates):
             idea.status = "approved"
         return redirect_to_account_route("/growth/ideas", account_slug=account_slug)
 
-    @router.get("/growth/ideas/{idea_id}/dismiss")
-    def growth_idea_dismiss(idea_id: int, account: str | None = None) -> RedirectResponse:
-        if account is None:
-            raise HTTPException(400, "Use account-prefixed route")
-        return redirect_to_account_route(f"/growth/ideas/{idea_id}/dismiss", account_slug=account)
+    @router.post("/growth/ideas/{idea_id}/dismiss")
+    def growth_idea_dismiss(idea_id: int, account: str | None = None) -> Response:
+        return reject_ambiguous_account_mutation()
 
-    @router.get("/accounts/{account_slug}/growth/ideas/{idea_id}/dismiss")
+    @router.post("/accounts/{account_slug}/growth/ideas/{idea_id}/dismiss")
     def growth_idea_dismiss_prefixed(idea_id: int, account_slug: str) -> RedirectResponse:
         with session_scope() as session:
             require_account(session, account_slug)

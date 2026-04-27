@@ -341,11 +341,11 @@
 {# ── Bulk action bar ── #}
 <div class="cm-bulk-bar" id="bulkBar">
   <span class="cm-bulk-count" id="bulkCount">0 selected</span>
-  <button onclick="bulkAction('approve')">Approve</button>
-  <button onclick="bulkAction('unapprove')">Unapprove</button>
-  <button onclick="bulkAction('ignore')">Ignore</button>
-  <button class="cm-bulk-send" onclick="bulkAction('send')">Send selected</button>
-  <button onclick="bulkAction('regenerate')">Regenerate drafts</button>
+  <button data-bulk-action="approve" onclick="bulkAction('approve')">Approve</button>
+  <button data-bulk-action="unapprove" onclick="bulkAction('unapprove')">Unapprove</button>
+  <button data-bulk-action="ignore" onclick="bulkAction('ignore')">Ignore</button>
+  <button class="cm-bulk-send" data-bulk-action="send" onclick="bulkAction('send')">Send selected</button>
+  <button data-bulk-action="regenerate" onclick="bulkAction('regenerate')">Regenerate drafts</button>
 </div>
 
 {# ── Edit draft modal ── #}
@@ -396,9 +396,44 @@
   });
 
   // ── Bulk actions ──
+  const bulkActionLabels = {
+    approve: 'Approve',
+    unapprove: 'Unapprove',
+    ignore: 'Ignore',
+    send: 'Send selected',
+    regenerate: 'Regenerate drafts',
+  };
+  let bulkActionInFlight = false;
+
+  function setBulkActionDisabled(disabled) {
+    document.querySelectorAll('[data-bulk-action]').forEach(button => {
+      button.disabled = disabled;
+      button.setAttribute('aria-busy', disabled ? 'true' : 'false');
+    });
+  }
+
+  function bulkSuccessMessage(action, data, count) {
+    if (action === 'send') {
+      return `Send selected finished: ${data.sent || 0} sent, ${data.failed || 0} failed, ${data.skipped || 0} skipped.`;
+    }
+    const resultKey = {approve: 'approved', unapprove: 'unapproved', ignore: 'ignored', regenerate: 'regenerated'}[action];
+    const changed = resultKey && typeof data[resultKey] === 'number' ? data[resultKey] : count;
+    return `${bulkActionLabels[action]} finished for ${changed} comment${changed === 1 ? '' : 's'}.`;
+  }
+
   window.bulkAction = async function(action) {
+    if (bulkActionInFlight) { return; }
     const ids = getSelectedIds();
-    if (ids.length === 0) { showToast('Select items first', 'error'); return; }
+    if (ids.length === 0) { showToast('Select comments first', 'error'); return; }
+    const actionLabel = bulkActionLabels[action] || action;
+    if (action === 'send' && !confirm(`Send ${ids.length} selected reply${ids.length === 1 ? '' : 'ies'} to Threads now?`)) {
+      return;
+    }
+
+    bulkActionInFlight = true;
+    setBulkActionDisabled(true);
+    showToast(`${actionLabel} started for ${ids.length} comment${ids.length === 1 ? '' : 's'}...`, 'success');
+
     try {
       const resp = await fetch(PREFIX + '/comments/api/' + action, {
         method: 'POST',
@@ -407,13 +442,16 @@
       });
       const data = await resp.json();
       if (data.success) {
-        showToast(action + ' done', 'success');
+        showToast(bulkSuccessMessage(action, data, ids.length), 'success');
         location.reload();
       } else {
-        showToast(data.error || 'Failed', 'error');
+        showToast(`${actionLabel} failed: ${data.error || 'Unknown error'}`, 'error');
       }
     } catch(e) {
-      showToast('Network error', 'error');
+      showToast(`${actionLabel} failed: network error`, 'error');
+    } finally {
+      bulkActionInFlight = false;
+      setBulkActionDisabled(false);
     }
   };
 

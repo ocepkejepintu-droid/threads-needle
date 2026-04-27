@@ -42,7 +42,9 @@
         </div>
       </div>
       <a href="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/edit" class="btn btn-sm btn-secondary">Edit</a>
-      <a href="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/dismiss" class="btn btn-sm btn-danger">Dismiss</a>
+      <form method="post" action="{{ account_path_prefix }}/growth/ideas/{{ idea.id }}/dismiss" class="inline-action-form" onsubmit="return confirm('Dismiss this idea? It will move to rejected ideas.');">
+        <button type="submit" class="btn btn-sm btn-danger">Dismiss</button>
+      </form>
       {% elif idea.status == 'scheduled' %}
       <a href="{{ account_path_prefix }}/calendar" class="btn btn-sm btn-secondary">View in Calendar</a>
       {% endif %}
@@ -189,6 +191,12 @@
 .idea-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-action-form {
+  display: inline-flex;
+  margin: 0;
 }
 
 .schedule-dropdown {

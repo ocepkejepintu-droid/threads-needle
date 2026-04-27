@@ -114,12 +114,12 @@
 
 .score-max {
   font-size: 1.25rem;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
-.score-good { color: var(--ok); }
-.score-warning { color: var(--warning); }
-.score-bad { color: var(--bad); }
+.score-good { color: var(--pos); }
+.score-warning { color: var(--warn); }
+.score-bad { color: var(--neg); }
 
 .pass-rate-display {
   text-align: center;
@@ -135,7 +135,7 @@
 
 .pass-rate-bar {
   height: 8px;
-  background: var(--panel-2);
+  background: var(--surface-sunken);
   border-radius: 4px;
   overflow: hidden;
   margin: 0.5rem 0;
@@ -143,7 +143,7 @@
 
 .pass-rate-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--ok), var(--accent));
+  background: var(--pos);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -172,9 +172,9 @@
   transition: height 0.3s ease;
 }
 
-.trend-good { background: var(--ok); }
-.trend-warning { background: var(--warning); }
-.trend-bad { background: var(--bad); }
+.trend-good { background: var(--pos); }
+.trend-warning { background: var(--warn); }
+.trend-bad { background: var(--neg); }
 
 .trend-labels {
   display: flex;
@@ -191,7 +191,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--panel-2);
+  border-bottom: 1px solid var(--divider);
 }
 
 .violation-item:last-child {
@@ -206,7 +206,7 @@
 .violation-count {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--bad);
+  color: var(--neg);
   background: rgba(244, 63, 94, 0.1);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -224,7 +224,7 @@
 }
 
 .recommendations-list li::marker {
-  color: var(--accent);
+  color: var(--link);
 }
 
 .empty-state {
@@ -281,7 +281,7 @@
 }
 
 .actions-bar .btn-primary {
-  background: var(--accent);
+  background: var(--text);
   color: white;
 }
 

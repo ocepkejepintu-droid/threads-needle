@@ -6,9 +6,9 @@
   <p class="muted">Account growth score, patterns, and action queue.</p>
 </div>
 
-<section class="hero-card">
-  <div class="hero-title">Aggregate Growth Score</div>
-  <div class="hero-metric">{{ "%.1f"|format(growth.score) }}</div>
+<section class="card card-hero card-hero-green">
+  <div class="hero-label">Aggregate Growth Score</div>
+  <div class="hero-number">{{ "%.1f"|format(growth.score) }}</div>
   <div class="z-score-grid">
     <div class="z-score-item">
       <span class="z-score-value">{{ "%.2f"|format(growth.follower_velocity_z) }}</span>
@@ -129,12 +129,6 @@
   margin: 0 0 0.25rem;
 }
 
-.hero-metric {
-  font-size: 3rem;
-  font-weight: 700;
-  margin: 0.5rem 0;
-}
-
 .z-score-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -147,19 +141,20 @@
   flex-direction: column;
   align-items: center;
   padding: 0.75rem;
-  background: var(--surface-sunken);
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 8px;
 }
 
 .z-score-value {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-body);
+  color: inherit;
 }
 
 .z-score-label {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: inherit;
+  opacity: 0.75;
   text-transform: capitalize;
 }
 

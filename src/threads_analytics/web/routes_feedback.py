@@ -10,10 +10,14 @@ from sqlalchemy import desc, select
 from ..db import session_scope
 from ..models import MechanicPerformance, PredictionAccuracy
 from ..performance_feedback import generate_feedback_report
-from .routes_common import with_account_context, require_account
+from .routes_common import redirect_to_account_route, require_account, with_account_context
 
 
 def register_feedback_routes(router: APIRouter, templates: Jinja2Templates) -> None:
+    @router.get("/feedback")
+    def feedback_redirect(account: str | None = None):
+        return redirect_to_account_route("/feedback", account)
+
     @router.get("/accounts/{account_slug}/feedback")
     def feedback_page(request: Request, account_slug: str) -> HTMLResponse:
         report = generate_feedback_report_for_slug(account_slug)

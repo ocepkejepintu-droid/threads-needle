@@ -344,6 +344,13 @@ def test_legacy_read_routes_redirect_to_prefixed(populated_app):
     assert experiments.status_code == 303
     assert experiments.headers["location"] == f"/accounts/{ids['default']}/experiments"
 
+    feedback = client.get(
+        f"/feedback?account={ids['default']}",
+        follow_redirects=False,
+    )
+    assert feedback.status_code == 303
+    assert feedback.headers["location"] == f"/accounts/{ids['default']}/feedback"
+
 
 def test_prefixed_experiments_routes_render(populated_app):
     client, ids = populated_app
@@ -597,6 +604,8 @@ def test_portfolio_route_remains_prefix_free(populated_app):
     assert "Aggregate Growth Score" in r.text
     assert "Top Patterns" in r.text
     assert "Action Queue" in r.text
+    assert 'href="/accounts/default"' in r.text
+    assert 'href="/accounts/None"' not in r.text
 
 
 def test_static_css_served(populated_app):
@@ -1184,6 +1193,23 @@ def test_brand_report_prefixed_route_renders(populated_app):
     client, ids = populated_app
     r = client.get(f"/accounts/{ids['default']}/brand-report")
     assert r.status_code == 200
+    assert "var(--muted)" not in r.text
+    assert "var(--ok)" not in r.text
+    assert "var(--warning)" not in r.text
+    assert "var(--bad)" not in r.text
+    assert "var(--panel-2)" not in r.text
+    assert "var(--accent)" not in r.text
+
+
+def test_feedback_dashboard_uses_defined_tokens_and_error_states(populated_app):
+    client, ids = populated_app
+    r = client.get(f"/accounts/{ids['default']}/feedback")
+    assert r.status_code == 200
+    assert "var(--card)" not in r.text
+    assert "var(--muted)" not in r.text
+    assert "var(--text-secondary)" not in r.text
+    assert "Unable to load mechanic data" in r.text
+    assert "Unable to load predictions" in r.text
 
 
 def test_brand_legacy_routes_redirect(populated_app):

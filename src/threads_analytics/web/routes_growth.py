@@ -463,11 +463,12 @@ def register_growth_routes(router, templates: Jinja2Templates):
         return templates.TemplateResponse(
             request,
             "portfolio.html",
-            {
-                "growth": growth,
-                "accounts": account_rows,
-                "planned": all_planned_sorted,
-                "patterns": pattern_payload,
-                "recent_outcomes": recent_outcomes,
-            },
+            with_account_context(
+                None,
+                growth=growth,
+                accounts=account_rows,
+                planned=all_planned_sorted,
+                patterns=pattern_payload,
+                recent_outcomes=recent_outcomes,
+            ),
         )

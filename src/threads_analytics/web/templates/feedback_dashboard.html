@@ -153,6 +153,10 @@
           }
         }
       });
+    })
+    .catch(() => {
+      document.getElementById('mechanic-chart-container').innerHTML =
+        '<p class="text-center text-muted">Unable to load mechanic data</p>';
     });
 
   // Load recent accuracies
@@ -176,28 +180,32 @@
           <td><span class="tag">${item.actual_outcome_tag || '—'}</span></td>
         </tr>`;
       }).join('');
+    })
+    .catch(() => {
+      document.getElementById('accuracy-tbody').innerHTML =
+        '<tr><td colspan="6" class="text-center">Unable to load predictions</td></tr>';
     });
 </script>
 
 <style>
   .bias-list { display: grid; gap: 12px; }
-  .bias-item { padding: 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); }
-  .bias-item.bias-over { border-left: 4px solid #f59e0b; }
-  .bias-item.bias-under { border-left: 4px solid #22c55e; }
-  .bias-item.bias-ok { border-left: 4px solid #6366f1; }
+  .bias-item { padding: 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+  .bias-item.bias-over { border-left: 4px solid var(--warn); }
+  .bias-item.bias-under { border-left: 4px solid var(--pos); }
+  .bias-item.bias-ok { border-left: 4px solid var(--link); }
   .bias-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .bias-header .badge { font-size: 11px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: var(--surface); color: var(--muted); }
-  .sample-size { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .bias-header .badge { font-size: 11px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: var(--surface-sunken); color: var(--text-muted); }
+  .sample-size { font-size: 12px; color: var(--text-muted); margin-left: auto; }
   .bias-body { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
   .bias-metric { text-align: center; }
   .bias-number { display: block; font-size: 20px; font-weight: 700; }
-  .bias-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-  .bias-insight { flex: 1; min-width: 200px; margin: 0; font-size: 14px; color: var(--text-secondary); }
+  .bias-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+  .bias-insight { flex: 1; min-width: 200px; margin: 0; font-size: 14px; color: var(--text-body); }
   .suggestion-list { padding-left: 20px; }
-  .suggestion-list li { margin-bottom: 8px; color: var(--text-secondary); }
-  .tag-success { color: #16a34a; font-weight: 600; }
-  .tag-warning { color: #ca8a04; font-weight: 600; }
-  .tag-danger { color: #dc2626; font-weight: 600; }
+  .suggestion-list li { margin-bottom: 8px; color: var(--text-body); }
+  .tag-success { color: var(--pos); font-weight: 600; }
+  .tag-warning { color: var(--warn); font-weight: 600; }
+  .tag-danger { color: var(--neg); font-weight: 600; }
 </style>
 
 {% endblock %}

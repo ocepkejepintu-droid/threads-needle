@@ -29,28 +29,6 @@
     </div>
   </section>
 
-  <section class="gt-quick-cell card">
-    <h2>Quick Actions</h2>
-    <div class="quick-actions">
-      <a href="{{ account_path_prefix }}/experiments/new" class="quick-action">
-        <span class="qa-icon">🧪</span>
-        <span class="qa-label">New experiment</span>
-      </a>
-      <a href="{{ account_path_prefix }}/compose" class="quick-action">
-        <span class="qa-icon">✍️</span>
-        <span class="qa-label">Compose</span>
-      </a>
-      <a href="{{ account_path_prefix }}/content" class="quick-action">
-        <span class="qa-icon">📝</span>
-        <span class="qa-label">Pipeline</span>
-      </a>
-      <a href="{{ account_path_prefix }}/comments" class="quick-action">
-        <span class="qa-icon">💬</span>
-        <span class="qa-label">Comments</span>
-      </a>
-    </div>
-  </section>
-
   {% for card in panel.cards %}
     {% if card.name == panel.hero_metric_name %}
       <section class="gt-metric-hero card-hero metric-hero {{ panel.hero_metric_color }}">
@@ -110,51 +88,6 @@
 }
 .empty-state.compact .muted {
   margin-bottom: 10px;
-}
-.gt-quick-cell {
-  grid-column: span 2;
-}
-.gt-quick-cell h2 {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-  margin: 0 0 10px;
-}
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.quick-action {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 6px;
-  background: var(--surface-sunken);
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--text);
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
-}
-.quick-action:hover {
-  background: var(--border);
-  text-decoration: none;
-  transform: translateY(-1px);
-}
-.qa-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-.qa-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-body);
-}
-@media (max-width: 960px) {
-  .gt-quick-cell { grid-column: span 2; }
 }
 </style>
 

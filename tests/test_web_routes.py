@@ -303,6 +303,7 @@ def test_ground_truth_prefixed_route_renders(populated_app):
     assert r.status_code == 200
     assert "testuser" in r.text
     assert "active" in r.text
+    assert "Quick Actions" not in r.text
 
 
 def test_legacy_ground_truth_redirects_to_prefixed(populated_app):

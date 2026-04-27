@@ -79,7 +79,7 @@ METRIC_META = {
     },
     METRIC_FOLLOWER_VELOCITY: {
         "label": "Follower velocity",
-        "description": "Follower gain per day, 7-day rolling average. Net growth from the account snapshots.",
+        "description": "Follower gain per day from account snapshots, using up to a 7-day lookback.",
         "unit": "/day",
         "direction": "up",
         "format": "raw",
@@ -199,6 +199,35 @@ def _latest_follower_count(session: Session, at_or_before: datetime, account_id:
     return snap.follower_count if snap else None
 
 
+def _latest_follower_snapshot(
+    session: Session, at_or_before: datetime, account_id: int
+) -> MyAccountInsight | None:
+    return session.scalar(
+        select(MyAccountInsight)
+        .where(
+            MyAccountInsight.account_id == account_id,
+            MyAccountInsight.fetched_at <= at_or_before,
+        )
+        .order_by(MyAccountInsight.fetched_at.desc())
+        .limit(1)
+    )
+
+
+def _earliest_follower_snapshot(
+    session: Session, after: datetime, before: datetime, account_id: int
+) -> MyAccountInsight | None:
+    return session.scalar(
+        select(MyAccountInsight)
+        .where(
+            MyAccountInsight.account_id == account_id,
+            MyAccountInsight.fetched_at > after,
+            MyAccountInsight.fetched_at < before,
+        )
+        .order_by(MyAccountInsight.fetched_at.asc())
+        .limit(1)
+    )
+
+
 def compute_metric(
     session: Session,
     name: str,
@@ -287,17 +316,35 @@ def compute_metric(
 
     if name == METRIC_FOLLOWER_VELOCITY:
         # 7-day rolling: (followers at `until`) - (followers 7 days before `until`) / 7
-        end_count = _latest_follower_count(session, until, account_id)
-        start_count = _latest_follower_count(session, until - timedelta(days=7), account_id)
-        if end_count is None or start_count is None:
+        end_snapshot = _latest_follower_snapshot(session, until, account_id)
+        if end_snapshot is None or end_snapshot.fetched_at is None:
             return MetricValue(name, None, since, until, len(rows))
+        lookback_start = until - timedelta(days=7)
+        start_snapshot = _latest_follower_snapshot(session, lookback_start, account_id)
+        partial_history = False
+        days = 7.0
+        if start_snapshot is None:
+            start_snapshot = _earliest_follower_snapshot(
+                session, lookback_start, end_snapshot.fetched_at, account_id
+            )
+            partial_history = True
+            if start_snapshot is None or start_snapshot.fetched_at is None:
+                return MetricValue(name, None, since, until, len(rows))
+            days = (end_snapshot.fetched_at - start_snapshot.fetched_at).total_seconds() / 86400
+            if days <= 0:
+                return MetricValue(name, None, since, until, len(rows))
         return MetricValue(
             name,
-            (end_count - start_count) / 7.0,
+            (end_snapshot.follower_count - start_snapshot.follower_count) / days,
             since,
             until,
             len(rows),
-            detail={"end": end_count, "start": start_count},
+            detail={
+                "end": end_snapshot.follower_count,
+                "start": start_snapshot.follower_count,
+                "days": days,
+                "partial_history": partial_history,
+            },
         )
 
     raise ValueError(f"unknown metric: {name}")
